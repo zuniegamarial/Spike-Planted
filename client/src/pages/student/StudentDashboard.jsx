@@ -1,23 +1,32 @@
 import { useEffect, useState } from 'react';
 import {
-  Play, Circle, Clock, Calendar, FileText, Star, Square
+  Play, Circle, Clock, Calendar, FileText, Star, Square, X, AlertCircle
 } from 'lucide-react';
 import {
   LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip
 } from 'recharts';
 import { format } from 'date-fns';
 import { useAuth } from '../../context/AuthContext';
-import { useNotifications } from '../../context/NotificationContext'; // <-- Added Import
+import { useNotifications } from '../../context/NotificationContext';
 import { api } from '../../api/axios';
 
 export default function StudentDashboard() {
   const { user } = useAuth();
-  const { addNotification } = useNotifications(); // <-- Added Hook
+  const { addNotification } = useNotifications();
 
   const [attendance, setAttendance] = useState({
     summary: null,
     records: []
   });
+  
+  const [pendingSummary, setPendingSummary] = useState({
+    documents: 0,
+    journals: 0,
+    attendance: 0,
+    total: 0
+  });
+
+  const [showPendingPopover, setShowPendingPopover] = useState(false); // <-- Added Popover State
 
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -25,25 +34,33 @@ export default function StudentDashboard() {
 
   const REQUIRED_HOURS = 486;
 
-  // Load actual attendance records from MongoDB
+  // Load actual attendance records AND pending counts from MongoDB
   const fetchAll = async () => {
     try {
-      const response = await api.get('/ojt/my-attendance');
+      const [attRes, profileRes] = await Promise.all([
+        api.get('/ojt/my-attendance'),
+        api.get('/profile')
+      ]);
 
-      const data = response.data;
+      const data = attRes.data;
 
       setAttendance({
         summary: data.summary,
         records: data.attendance || []
       });
 
+      // Set real pending counts from the backend
+      if (profileRes.data.pendingSummary) {
+        setPendingSummary(profileRes.data.pendingSummary);
+      }
+
       setError('');
     } catch (err) {
-      console.error('Attendance loading error:', err);
+      console.error('Dashboard loading error:', err);
 
       setError(
         err.response?.data?.message ||
-        'Unable to load attendance records.'
+        'Unable to load dashboard data.'
       );
     } finally {
       setLoading(false);
@@ -67,13 +84,13 @@ export default function StudentDashboard() {
 
       if (action === 'time-in') {
         await api.post('/ojt/time-in');
-        addNotification('You have successfully timed in.', 'success'); // <-- Added Notification
+        addNotification('You have successfully timed in.', 'success');
       } else {
         await api.post('/ojt/time-out');
-        addNotification('You have successfully timed out.', 'success'); // <-- Added Notification
+        addNotification('You have successfully timed out.', 'success');
       }
 
-      // Refresh attendance from MongoDB
+      // Refresh attendance and pending counts from MongoDB
       await fetchAll();
 
     } catch (err) {
@@ -132,9 +149,8 @@ export default function StudentDashboard() {
     0
   );
 
-  const pendingCount = attendance.records.filter(
-    r => r.status === 'Pending'
-  ).length;
+  // Count of approved docs (for the Docs tile)
+  const approvedDocsCount = pendingSummary.documents === 0 ? '0' : '?'; 
 
   if (loading) {
     return (
@@ -235,23 +251,77 @@ export default function StudentDashboard() {
               <div className="flex items-center gap-1.5 text-xs text-muted mb-1">
                 <FileText size={12} /> Docs
               </div>
-              <p className="text-xl font-extrabold text-success">0/0</p>
+              <p className="text-xl font-extrabold text-success">
+                {approvedDocsCount}/4
+              </p>
             </div>
 
-            <div className="rounded-2xl bg-orange-50 p-3">
-              <div className="flex items-center gap-1.5 text-xs text-muted mb-1">
-                <Circle size={12} /> Pending
+            {/* PENDING TILE WITH POPOVER */}
+            <div className="relative">
+              <div 
+                onClick={() => setShowPendingPopover(!showPendingPopover)}
+                className="rounded-2xl bg-orange-50 p-3 cursor-pointer hover:bg-orange-100 transition border border-orange-100 h-full"
+              >
+                <div className="flex items-center gap-1.5 text-xs text-muted mb-1">
+                  <Circle size={12} /> Pending
+                </div>
+                <p className="text-xl font-extrabold text-warning">
+                  {pendingSummary.total}
+                </p>
               </div>
-              <p className="text-xl font-extrabold text-warning">
-                {pendingCount}
-              </p>
+
+              {/* THE POPOVER CARD */}
+              {showPendingPopover && (
+                <>
+                  {/* Click outside to close */}
+                  <div className="fixed inset-0 z-40" onClick={() => setShowPendingPopover(false)}></div>
+                  
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 bg-white rounded-2xl shadow-xl border border-border p-4 z-50 animate-in fade-in zoom-in-95">
+                    <div className="flex items-center justify-between mb-3 border-b border-border pb-2">
+                      <h4 className="text-sm font-bold text-text flex items-center gap-2">
+                        <AlertCircle size={14} className="text-warning" /> Pending Items
+                      </h4>
+                      <button onClick={() => setShowPendingPopover(false)} className="text-muted hover:text-text"><X size={14}/></button>
+                    </div>
+                    
+                    {pendingSummary.total === 0 ? (
+                      <p className="text-xs text-muted text-center py-2">All caught up! No pending items.</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {pendingSummary.documents > 0 && (
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="text-muted">Documents</span>
+                            <span className="font-bold text-text bg-orange-50 px-2 py-0.5 rounded-md">{pendingSummary.documents}</span>
+                          </div>
+                        )}
+                        {pendingSummary.journals > 0 && (
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="text-muted">Journals</span>
+                            <span className="font-bold text-text bg-orange-50 px-2 py-0.5 rounded-md">{pendingSummary.journals}</span>
+                          </div>
+                        )}
+                        {pendingSummary.attendance > 0 && (
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="text-muted">Attendance</span>
+                            <span className="font-bold text-text bg-orange-50 px-2 py-0.5 rounded-md">{pendingSummary.attendance}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {/* Little arrow pointing down */}
+                    <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-4 h-4 bg-white border-b border-r border-border rotate-45"></div>
+                  </div>
+                </>
+              )}
             </div>
 
             <div className="rounded-2xl bg-gray-50 p-3">
               <div className="flex items-center gap-1.5 text-xs text-muted mb-1">
                 <Calendar size={12} /> Journals
               </div>
-              <p className="text-xl font-extrabold text-text">0</p>
+              <p className="text-xl font-extrabold text-text">
+                {pendingSummary.journals}
+              </p>
             </div>
 
           </div>

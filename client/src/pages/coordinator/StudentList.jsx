@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -243,12 +242,27 @@ export default function StudentList() {
                     key={s._id}
                     className="hover:bg-background/50 transition"
                   >
+                    {/* UPDATED STUDENT NAME WITH PROFILE PICTURE */}
                     <td className="px-6 py-4 font-semibold">
                       <button
                         onClick={() => viewStudent(s._id)}
-                        className="text-primary hover:underline text-left font-semibold"
+                        className="flex items-center gap-3 text-left hover:underline text-primary"
                       >
-                        {s.firstName} {s.lastName}
+                        <div className="w-8 h-8 rounded-full bg-primary-light flex items-center justify-center text-primary text-xs font-bold overflow-hidden shrink-0">
+                          {s.avatar ? (
+                            <img 
+                              src={`http://localhost:5000${s.avatar}`} 
+                              alt="avatar" 
+                              className="w-full h-full object-cover"
+                              onError={(e) => { e.target.style.display = 'none'; e.target.parentElement.innerText = s.firstName.charAt(0); }}
+                            />
+                          ) : (
+                            s.firstName.charAt(0)
+                          )}
+                        </div>
+                        <span className="font-semibold">
+                          {s.firstName} {s.lastName}
+                        </span>
                       </button>
                     </td>
 

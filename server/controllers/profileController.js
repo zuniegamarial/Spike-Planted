@@ -2,6 +2,8 @@ const User = require('../models/User');
 const Student = require('../models/Student');
 const Document = require('../models/Document');
 const Company = require('../models/Company');
+const WeeklyJournal = require('../models/WeeklyJournal'); // <-- Added for pending count
+const OjtRecord = require('../models/OjtRecord'); // <-- Added for pending count
 const path = require('path');
 const fs = require('fs');
 
@@ -19,10 +21,29 @@ exports.getMyProfile = async (req, res) => {
       companyData = await Company.findOne({ name: user.student.company });
     }
 
-    // Get their documents
-    const documents = user.student 
-      ? await Document.find({ student: user.student._id }) 
-      : [];
+    let documents = [];
+    let pendingDocsCount = 0;
+    let pendingJournalsCount = 0;
+    let pendingAttendanceCount = 0;
+
+    if (user.student) {
+      // Get their documents
+      documents = await Document.find({ student: user.student._id });
+      
+      // Calculate pending counts for the dashboard
+      pendingDocsCount = documents.filter(d => d.status === 'Pending').length;
+      
+      pendingJournalsCount = await WeeklyJournal.countDocuments({ 
+        student: user.student._id, 
+        status: 'Submitted' 
+      });
+
+      pendingAttendanceCount = await OjtRecord.countDocuments({
+        student: user.student._id,
+        status: 'Pending',
+        timeOut: { $ne: null }
+      });
+    }
 
     return res.status(200).json({
       success: true,
@@ -31,13 +52,20 @@ exports.getMyProfile = async (req, res) => {
         fullName: user.fullName,
         email: user.email,
         role: user.role,
-        avatar: user.avatar, // <-- Added avatar
+        avatar: user.avatar,
         company: user.company,
         department: user.department
       },
       student: user.student,
       company: companyData,
-      documents
+      documents,
+      // Send the pending counts to the frontend
+      pendingSummary: {
+        documents: pendingDocsCount,
+        journals: pendingJournalsCount,
+        attendance: pendingAttendanceCount,
+        total: pendingDocsCount + pendingJournalsCount + pendingAttendanceCount
+      }
     });
   } catch (error) {
     console.error('Get profile error:', error.message);
@@ -105,7 +133,7 @@ exports.uploadAvatar = async (req, res) => {
       }
     }
 
-    // Save the new path to the database (Multer saves it to uploads/documents by default, we'll use that)
+    // Save the new path to the database
     user.avatar = `/uploads/documents/${req.file.filename}`;
     await user.save();
 

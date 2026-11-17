@@ -4,19 +4,28 @@ const Student = require('../models/Student');
 const OjtRecord = require('../models/OjtRecord');
 const WeeklyJournal = require('../models/WeeklyJournal');
 const Document = require('../models/Document');
-const User = require('../models/User'); // <-- Added User model for approvals
+const User = require('../models/User');
 
 // ─────────────────────────────────────────────
-// COORDINATOR: GET ALL STUDENTS
+// COORDINATOR: GET ALL STUDENTS (With Avatars)
 // ─────────────────────────────────────────────
 exports.getAllStudents = async (req, res) => {
   try {
     const students = await Student.find().sort({ lastName: 1 });
 
+    // Fetch the avatar for each student from the User collection
+    const studentsWithAvatars = await Promise.all(students.map(async (student) => {
+      const user = await User.findOne({ email: student.email }).select('avatar');
+      return {
+        ...student.toObject(),
+        avatar: user ? user.avatar : ""
+      };
+    }));
+
     return res.status(200).json({
       success: true,
-      count: students.length,
-      students
+      count: studentsWithAvatars.length,
+      students: studentsWithAvatars
     });
   } catch (error) {
     console.error('Get all students error:', error.message);

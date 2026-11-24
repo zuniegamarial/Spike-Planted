@@ -103,9 +103,9 @@ async function startServer() {
       throw new Error('JWT_SECRET is missing from the .env file.');
     }
 
-    await mongoose.connect(process.env.MONGODB_URI);
+    //await mongoose.connect(process.env.MONGODB_URI);
 
-    console.log('MongoDB Atlas connected successfully!');
+    //console.log('MongoDB Atlas connected successfully!');
 
     app.listen(PORT, () => {
       console.log(`SPIKE PLANTED API running on http://localhost:${PORT}`);

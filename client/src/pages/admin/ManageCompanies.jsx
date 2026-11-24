@@ -63,8 +63,12 @@ export default function ManageCompanies() {
               <div key={company._id} className="flex flex-col md:flex-row md:items-center justify-between p-4 rounded-2xl bg-background border border-border gap-4">
                 <div>
                   <h4 className="font-bold text-text">{company.name}</h4>
-                  <p className="text-xs text-muted flex items-center gap-1 mt-1"><User size={12}/> {company.contactPerson}</p>
-                  <p className="text-xs text-muted flex items-center gap-1"><Mail size={12}/> {company.email}</p>
+                  <p className="text-xs text-muted flex items-center gap-1 mt-1">
+                    <User size={12}/> {company.contactPerson || 'No Name'}
+                  </p>
+                  <p className="text-xs text-muted flex items-center gap-1">
+                    <Mail size={12}/> {company.email}
+                  </p>
                 </div>
                 <div className="flex gap-2">
                   <button onClick={() => handleReject(company._id)} className="flex items-center gap-1 px-4 py-2 rounded-xl text-xs font-bold bg-red-50 text-danger hover:bg-red-100 transition">
@@ -93,7 +97,14 @@ export default function ManageCompanies() {
                   <Building size={20} />
                 </div>
                 <h3 className="font-bold text-text mb-1">{c.name}</h3>
-                <p className="text-xs text-muted">{c.contactPerson}</p>
+                {/* Show the updated contact person name */}
+                <p className="text-xs font-semibold text-text/80 mb-1">
+                  {c.contactPerson || 'No Name'}
+                </p>
+                {/* Show the email to verify the linked account */}
+                <p className="text-[10px] text-muted flex items-center gap-1">
+                  <Mail size={10} /> {c.email}
+                </p>
               </div>
             ))}
           </div>

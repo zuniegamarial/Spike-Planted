@@ -1,4 +1,3 @@
-
 const Company = require('../models/Company');
 const User = require('../models/User');
 
@@ -7,9 +6,19 @@ exports.getAllCompanies = async (req, res) => {
   try {
     const companies = await Company.find().sort({ createdAt: -1 });
 
+    // Map over companies and fetch the latest name from the User profile
+    const companiesWithUpdatedNames = await Promise.all(companies.map(async (c) => {
+      const user = await User.findOne({ email: c.email });
+      return {
+        ...c.toObject(),
+        // Use the User's updated fullName, or fallback to the original contactPerson
+        contactPerson: user ? user.fullName : c.contactPerson
+      };
+    }));
+
     return res.status(200).json({
       success: true,
-      companies
+      companies: companiesWithUpdatedNames
     });
   } catch (error) {
     console.error('Get companies error:', error);

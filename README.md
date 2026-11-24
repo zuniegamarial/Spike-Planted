@@ -210,10 +210,10 @@ Spike-Planted/
 
 | Member | Role |
 |--------|------|
-| Zuniega, Marial Angel | Project Manager / Data Administrator |
+| Zuniega, Marial Angel | Project Manager |
 | Arcenal, Gabriel Angelo | Frontend Lead |
 | Baltasar, Rafael Salvador | Tester / QA |
-| Baldano, Christofer B. | Backend Lead |
+| Baldano, Christofer B. | Backend Lead / Data Administrator |
 
 Bicol University Polangui · Polangui, Albay · bupc-dean@bicol-u.edu.ph
 

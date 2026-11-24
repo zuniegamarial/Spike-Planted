@@ -2,10 +2,10 @@ import { useState, useEffect } from 'react';
 import { 
   User, GraduationCap, Mail, Phone, BookOpen, 
   Building, Briefcase, Calendar, Clock, ShieldCheck,
-  FileText, Lock, CheckCircle2, X, AlertCircle, Loader2
+  FileText, Lock, CheckCircle2, X, AlertCircle, Loader2, Shield
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { api, getFileUrl } from '../api/axios';
+import { api } from '../api/axios';
 import EditProfileModal from './EditProfileModal';
 
 export default function ProfilePopover({ onClose }) {
@@ -37,14 +37,15 @@ export default function ProfilePopover({ onClose }) {
 
   if (!data) return null;
 
-  // Safely extract data with fallbacks
   const userInfo = data.user || {};
   const studentInfo = data.student || {};
   const companyInfo = data.company || {};
   const documents = data.documents || [];
 
-  // Helper to find a specific document
   const findDoc = (type) => documents.find(d => d.documentType === type);
+
+  // CHECK IF USER IS ADMIN OR STAFF (Not a student)
+  const isAdminOrStaff = userInfo.role === 'admin' || userInfo.role === 'staff';
 
   return (
     <div className="absolute top-16 right-0 w-[800px] max-h-[85vh] overflow-y-auto bg-background rounded-3xl shadow-2xl border border-border z-50 animate-in fade-in slide-in-from-top-4 duration-200 flex flex-col">
@@ -60,7 +61,7 @@ export default function ProfilePopover({ onClose }) {
       <div className="flex items-center justify-between p-6 bg-white border-b border-border sticky top-0 z-10">
         <div>
           <h2 className="text-xl font-extrabold text-text">My Profile</h2>
-          <p className="text-xs text-muted">Manage your personal information and OJT details.</p>
+          <p className="text-xs text-muted">Manage your personal information and account details.</p>
         </div>
         <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-100 text-muted transition">
           <X size={20} />
@@ -71,12 +72,10 @@ export default function ProfilePopover({ onClose }) {
         
         {/* TOP BANNER */}
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-border flex items-center gap-6">
-          
-          {/* PROFILE PICTURE */}
           <div className="w-24 h-24 rounded-full bg-primary-light flex items-center justify-center text-primary text-3xl font-bold border-4 border-white shadow-sm overflow-hidden shrink-0">
             {userInfo.avatar ? (
               <img 
-                src={getFileUrl(userInfo.avatar)}
+                src={userInfo.avatar.startsWith('http') ? userInfo.avatar : `http://localhost:5000${userInfo.avatar}`} 
                 alt="Profile" 
                 className="w-full h-full object-cover"
                 onError={(e) => { e.target.style.display = 'none'; e.target.parentElement.innerText = userInfo.fullName?.charAt(0) || 'U'; }}
@@ -92,22 +91,25 @@ export default function ProfilePopover({ onClose }) {
               {userInfo.role}
             </span>
             
-            <div className="flex gap-6 mt-3 text-sm text-text">
-              <div className="flex items-center gap-2">
-                <GraduationCap size={16} className="text-muted" />
-                <div>
-                  <p className="font-semibold">{studentInfo.program || 'N/A'}</p>
-                  <p className="text-[10px] text-muted">Program</p>
+            {/* Show Program/ID ONLY if Student */}
+            {!isAdminOrStaff && (
+              <div className="flex gap-6 mt-3 text-sm text-text">
+                <div className="flex items-center gap-2">
+                  <GraduationCap size={16} className="text-muted" />
+                  <div>
+                    <p className="font-semibold">{studentInfo.program || 'N/A'}</p>
+                    <p className="text-[10px] text-muted">Program</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <FileText size={16} className="text-muted" />
+                  <div>
+                    <p className="font-semibold">{studentInfo.studentNumber || 'N/A'}</p>
+                    <p className="text-[10px] text-muted">Student ID</p>
+                  </div>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <FileText size={16} className="text-muted" />
-                <div>
-                  <p className="font-semibold">{studentInfo.studentNumber || 'N/A'}</p>
-                  <p className="text-[10px] text-muted">Student ID</p>
-                </div>
-              </div>
-            </div>
+            )}
           </div>
           <button 
             onClick={() => setShowEdit(true)}
@@ -119,58 +121,78 @@ export default function ProfilePopover({ onClose }) {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           
-          {/* PERSONAL INFORMATION */}
+          {/* PERSONAL INFORMATION (Always shown) */}
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-border">
             <h3 className="flex items-center gap-2 font-extrabold text-text mb-4">
               <User size={18} className="text-blue-600" /> Personal Information
             </h3>
             <div className="space-y-3 text-sm">
               <InfoRow icon={User} label="Full Name" value={userInfo.fullName} />
-              <InfoRow icon={FileText} label="Student ID" value={studentInfo.studentNumber || 'N/A'} />
               <InfoRow icon={Mail} label="Email Address" value={userInfo.email} />
               <InfoRow icon={Phone} label="Contact Number" value={studentInfo.contactNumber || 'Not set'} />
-              <InfoRow icon={GraduationCap} label="Program" value={studentInfo.program || 'N/A'} />
-              <InfoRow icon={BookOpen} label="Year Level" value={studentInfo.yearLevel || 'N/A'} />
+              {!isAdminOrStaff && (
+                <>
+                  <InfoRow icon={FileText} label="Student ID" value={studentInfo.studentNumber || 'N/A'} />
+                  <InfoRow icon={GraduationCap} label="Program" value={studentInfo.program || 'N/A'} />
+                  <InfoRow icon={BookOpen} label="Year Level" value={studentInfo.yearLevel || 'N/A'} />
+                </>
+              )}
             </div>
           </div>
 
-          {/* OJT PLACEMENT */}
-          <div className="bg-white rounded-2xl p-6 shadow-sm border border-border">
-            <h3 className="flex items-center gap-2 font-extrabold text-text mb-4">
-              <Building size={18} className="text-blue-600" /> OJT Placement
-            </h3>
-            <div className="space-y-3 text-sm">
-              <InfoRow icon={Building} label="Company Name" value={companyInfo.name || userInfo.company || 'Not Assigned'} />
-              <InfoRow icon={Briefcase} label="Company Supervisor" value={companyInfo.contactPerson || 'Not Assigned'} />
-              <InfoRow icon={User} label="OJT Coordinator" value="TBA" />
-              <InfoRow icon={Calendar} label="Start Date" value={companyInfo.createdAt ? new Date(companyInfo.createdAt).toLocaleDateString() : 'TBA'} />
-              <InfoRow icon={Clock} label="Required Hours" value="486 hours" />
-              <div className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
-                <div className="flex items-center gap-2 text-muted">
-                  <CheckCircle2 size={16} />
-                  <span className="text-xs font-semibold">Status</span>
-                </div>
-                <span className="bg-green-100 text-success text-xs font-bold px-2 py-1 rounded-full flex items-center gap-1">
-                  <CheckCircle2 size={12} /> {studentInfo.status || 'Active'}
-                </span>
+          {/* DYNAMIC SECTION: OJT PLACEMENT (Students) vs ADMIN ACCESS (Admins/Staff) */}
+          {isAdminOrStaff ? (
+            <div className="bg-white rounded-2xl p-6 shadow-sm border border-border">
+              <h3 className="flex items-center gap-2 font-extrabold text-text mb-4">
+                <Shield size={18} className="text-blue-600" /> System Access
+              </h3>
+              <div className="space-y-3 text-sm">
+                <InfoRow icon={ShieldCheck} label="Role" value={userInfo.role === 'admin' ? 'System Administrator' : 'Company Supervisor'} />
+                <InfoRow icon={Building} label="Department" value={userInfo.department || 'Administration'} />
+                <InfoRow icon={Mail} label="Account Status" value="Active" />
+                <InfoRow icon={Clock} label="Last Login" value={new Date().toLocaleDateString()} />
               </div>
             </div>
-          </div>
-
-          {/* DOCUMENTS */}
-          <div className="bg-white rounded-2xl p-6 shadow-sm border border-border">
-            <h3 className="flex items-center gap-2 font-extrabold text-text mb-4">
-              <FileText size={18} className="text-blue-600" /> Documents
-            </h3>
-            <div className="space-y-3">
-              <DocRow title="MOA (Memorandum of Agreement)" subtitle="Signed copy of the agreement with the company." doc={findDoc('MOA')} />
-              <DocRow title="Insurance" subtitle="Proof of student insurance coverage." doc={findDoc('Insurance')} />
-              <DocRow title="Endorsement Letter" subtitle="University endorsement for OJT." doc={findDoc('Endorsement Letter')} />
+          ) : (
+            <div className="bg-white rounded-2xl p-6 shadow-sm border border-border">
+              <h3 className="flex items-center gap-2 font-extrabold text-text mb-4">
+                <Building size={18} className="text-blue-600" /> OJT Placement
+              </h3>
+              <div className="space-y-3 text-sm">
+                <InfoRow icon={Building} label="Company Name" value={companyInfo.name || 'Not Assigned'} />
+                <InfoRow icon={Briefcase} label="Company Supervisor" value={companyInfo.contactPerson || 'Not Assigned'} />
+                <InfoRow icon={User} label="OJT Coordinator" value="TBA" />
+                <InfoRow icon={Calendar} label="Start Date" value={companyInfo.createdAt ? new Date(companyInfo.createdAt).toLocaleDateString() : 'TBA'} />
+                <InfoRow icon={Clock} label="Required Hours" value="486 hours" />
+                <div className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
+                  <div className="flex items-center gap-2 text-muted">
+                    <CheckCircle2 size={16} />
+                    <span className="text-xs font-semibold">Status</span>
+                  </div>
+                  <span className="bg-green-100 text-success text-xs font-bold px-2 py-1 rounded-full flex items-center gap-1">
+                    <CheckCircle2 size={12} /> {studentInfo.status || 'Active'}
+                  </span>
+                </div>
+              </div>
             </div>
-          </div>
+          )}
 
-          {/* ACCOUNT SECURITY */}
-          <div className="bg-white rounded-2xl p-6 shadow-sm border border-border">
+          {/* DOCUMENTS (Only show if NOT Admin/Staff) */}
+          {!isAdminOrStaff && (
+            <div className="bg-white rounded-2xl p-6 shadow-sm border border-border">
+              <h3 className="flex items-center gap-2 font-extrabold text-text mb-4">
+                <FileText size={18} className="text-blue-600" /> Documents
+              </h3>
+              <div className="space-y-3">
+                <DocRow title="MOA (Memorandum of Agreement)" subtitle="Signed copy of the agreement with the company." doc={findDoc('MOA')} />
+                <DocRow title="Insurance" subtitle="Proof of student insurance coverage." doc={findDoc('Insurance')} />
+                <DocRow title="Endorsement Letter" subtitle="University endorsement for OJT." doc={findDoc('Endorsement Letter')} />
+              </div>
+            </div>
+          )}
+
+          {/* ACCOUNT SECURITY (Always shown) */}
+          <div className={`bg-white rounded-2xl p-6 shadow-sm border border-border ${isAdminOrStaff ? 'md:col-span-2' : ''}`}>
             <h3 className="flex items-center gap-2 font-extrabold text-text mb-1">
               <ShieldCheck size={18} className="text-blue-600" /> Account Security
             </h3>
@@ -206,7 +228,6 @@ function InfoRow({ icon: Icon, label, value }) {
 }
 
 function DocRow({ title, subtitle, doc }) {
-  // Determine style based on actual status
   let badgeColor = "bg-gray-100 text-muted";
   let badgeText = "Missing";
   let badgeIcon = <AlertCircle size={10} />;

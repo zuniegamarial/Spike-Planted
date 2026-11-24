@@ -6,7 +6,8 @@ import {
   Clock,
   CheckCircle,
   RefreshCw,
-  ShieldCheck
+  ShieldCheck,
+  Building
 } from 'lucide-react';
 
 import { api } from '../../api/axios';
@@ -69,7 +70,7 @@ export default function AdminDashboard() {
       );
 
       if (response.data.success) {
-        setSuccess('User account approved successfully.');
+        setSuccess('Account approved successfully.');
         await loadDashboard();
       }
     } catch (err) {
@@ -278,11 +279,24 @@ export default function AdminDashboard() {
                 className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-2xl bg-background border border-border"
               >
                 <div>
-                  <p className="font-bold text-text">
-                    {acc.fullName}
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-bold text-text">
+                      {acc.fullName}
+                    </p>
+                    
+                    {/* BADGE TO DISTINGUISH USER VS COMPANY */}
+                    {acc.type === 'Company' ? (
+                      <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
+                        <Building size={10} /> Company
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">
+                        <Users size={10} /> User
+                      </span>
+                    )}
+                  </div>
 
-                  <p className="text-xs text-muted">
+                  <p className="text-xs text-muted mt-1">
                     {acc.email} • Requesting to be{' '}
                     <span className="font-semibold text-primary capitalize">
                       {acc.role}

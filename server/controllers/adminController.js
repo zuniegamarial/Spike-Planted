@@ -5,6 +5,7 @@ const Student = require('../models/Student');
 const OjtRecord = require('../models/OjtRecord');
 const WeeklyJournal = require('../models/WeeklyJournal');
 const Document = require('../models/Document');
+const Company = require('../models/Company'); // <-- Added Company model
 
 // ============================================
 // ADMIN: GET DASHBOARD SUMMARY
@@ -16,7 +17,8 @@ exports.getDashboardSummary = async (req, res) => {
       activeStudents,
       inactiveStudents,
       totalUsers,
-      pendingAccounts,
+      pendingUsers,
+      pendingCompanies,
       pendingJournals,
       pendingAttendance,
       pendingDocuments,
@@ -30,13 +32,16 @@ exports.getDashboardSummary = async (req, res) => {
 
       User.countDocuments(),
 
-      // FETCH PENDING USERS (Added 'staff' and specific fields)
+      // FETCH PENDING USERS (Coordinator / Admin)
       User.find({
         isActive: false,
-        role: { $in: ['coordinator', 'admin', 'staff'] }
+        role: { $in: ['coordinator', 'admin'] }
       })
-        .select('fullName email role department company createdAt')
+        .select('fullName email role department createdAt')
         .sort({ createdAt: -1 }),
+
+      // FETCH PENDING COMPANIES (Staff)
+      Company.find({ status: 'Pending' }),
 
       WeeklyJournal.countDocuments({
         status: 'Submitted'
@@ -69,6 +74,19 @@ exports.getDashboardSummary = async (req, res) => {
 
     const totalOjtHours = approvedHours[0]?.totalHours || 0;
 
+    // Combine pending users and pending companies into one list
+    const formattedPendingUsers = pendingUsers.map(u => ({ ...u._doc, type: 'User' }));
+    const formattedPendingCompanies = pendingCompanies.map(c => ({
+      _id: c._id,
+      fullName: c.contactPerson,
+      email: c.email,
+      role: 'staff',
+      company: c.name,
+      type: 'Company'
+    }));
+
+    const allPendingAccounts = [...formattedPendingUsers, ...formattedPendingCompanies];
+
     return res.status(200).json({
       success: true,
 
@@ -78,7 +96,7 @@ exports.getDashboardSummary = async (req, res) => {
         inactiveStudents,
         totalUsers,
         totalOjtHours: Number(totalOjtHours.toFixed(2)),
-        pendingAccounts: pendingAccounts.length,
+        pendingAccounts: allPendingAccounts.length, // <-- Count both
         pendingJournals,
         pendingAttendance,
         pendingDocuments,
@@ -86,7 +104,7 @@ exports.getDashboardSummary = async (req, res) => {
           pendingJournals + pendingAttendance + pendingDocuments
       },
 
-      pendingAccounts
+      pendingAccounts: allPendingAccounts
     });
 
   } catch (error) {
@@ -100,7 +118,7 @@ exports.getDashboardSummary = async (req, res) => {
 };
 
 // ============================================
-// ADMIN: APPROVE USER ACCOUNT
+// ADMIN: APPROVE USER OR COMPANY ACCOUNT
 // ============================================
 exports.approveUserAccount = async (req, res) => {
   try {
@@ -109,15 +127,33 @@ exports.approveUserAccount = async (req, res) => {
     if (!mongoose.Types.ObjectId.isValid(userId)) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid user ID.'
+        message: 'Invalid ID.'
       });
     }
 
+    // 1. Check if the ID belongs to a Company first
+    const company = await Company.findById(userId);
+    
+    if (company) {
+      // Approve the company
+      company.status = 'Approved';
+      await company.save();
+
+      // Also activate the Supervisor's user account
+      await User.findOneAndUpdate({ email: company.email }, { isActive: true });
+
+      return res.status(200).json({
+        success: true,
+        message: 'Company and Supervisor approved successfully.'
+      });
+    }
+
+    // 2. If not a company, it must be a User (Coordinator/Admin)
     const user = await User.findOneAndUpdate(
       {
         _id: userId,
         isActive: false,
-        role: { $in: ['coordinator', 'admin', 'staff'] } // Added 'staff'
+        role: { $in: ['coordinator', 'admin'] }
       },
       {
         $set: { isActive: true }
@@ -142,11 +178,11 @@ exports.approveUserAccount = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Approve user error:', error.message);
+    console.error('Approve error:', error.message);
 
     return res.status(500).json({
       success: false,
-      message: 'Failed to approve user account.'
+      message: 'Failed to approve account.'
     });
   }
 };

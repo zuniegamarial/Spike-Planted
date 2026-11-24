@@ -74,7 +74,7 @@ exports.getDashboardSummary = async (req, res) => {
 
     const totalOjtHours = approvedHours[0]?.totalHours || 0;
 
-    // Combine pending users and pending companies into one list
+    // Combine pending users and pending companies into one list for the frontend
     const formattedPendingUsers = pendingUsers.map(u => ({ ...u._doc, type: 'User' }));
     const formattedPendingCompanies = pendingCompanies.map(c => ({
       _id: c._id,
@@ -96,7 +96,7 @@ exports.getDashboardSummary = async (req, res) => {
         inactiveStudents,
         totalUsers,
         totalOjtHours: Number(totalOjtHours.toFixed(2)),
-        pendingAccounts: allPendingAccounts.length, // <-- Count both
+        pendingAccounts: allPendingAccounts.length,
         pendingJournals,
         pendingAttendance,
         pendingDocuments,

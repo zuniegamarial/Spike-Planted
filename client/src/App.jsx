@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { NotificationProvider } from './context/NotificationContext'; // <-- Added NotificationProvider
+import { NotificationProvider } from './context/NotificationContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import AppLayout from './layouts/AppLayout';
 
@@ -14,6 +14,8 @@ import Documents from './pages/student/Documents';
 
 // Staff (Company Supervisor) Pages
 import StaffDashboard from './pages/staff/StaffDashboard';
+import StaffInterns from './pages/staff/StaffInterns';
+import PostRequirements from './pages/staff/PostRequirements';
 
 // Coordinator Pages
 import CoordinatorDashboard from './pages/coordinator/CoordinatorDashboard';
@@ -39,7 +41,6 @@ function DashboardRouter() {
 export default function App() {
   return (
     <AuthProvider>
-      {/* WRAP THE APP WITH NOTIFICATION PROVIDER */}
       <NotificationProvider>
         <BrowserRouter>
           <Routes>
@@ -60,7 +61,8 @@ export default function App() {
               <Route path="/documents" element={<Documents />} />
 
               {/* STAFF (COMPANY SUPERVISOR) */}
-              <Route path="/interns" element={<StaffDashboard />} />
+              <Route path="/interns" element={<StaffInterns />} />
+              <Route path="/post-requirements" element={<PostRequirements />} />
 
               {/* COORDINATOR & ADMIN */}
               <Route path="/students" element={<StudentList />} />

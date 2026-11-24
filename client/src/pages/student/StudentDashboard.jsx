@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
-  Play, Circle, Clock, Calendar, FileText, Star, Square, X, AlertCircle
+  Play, Circle, Clock, Calendar, FileText, Star, Square, X, AlertCircle, CheckCircle2
 } from 'lucide-react';
 import {
   LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip
@@ -18,7 +18,7 @@ export default function StudentDashboard() {
     summary: null,
     records: []
   });
-  
+
   const [pendingSummary, setPendingSummary] = useState({
     documents: 0,
     journals: 0,
@@ -26,7 +26,9 @@ export default function StudentDashboard() {
     total: 0
   });
 
-  const [showPendingPopover, setShowPendingPopover] = useState(false); // <-- Added Popover State
+  const [requiredDocs, setRequiredDocs] = useState([]);
+  const [myDocs, setMyDocs] = useState([]);
+  const [showPendingPopover, setShowPendingPopover] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -34,12 +36,13 @@ export default function StudentDashboard() {
 
   const REQUIRED_HOURS = 486;
 
-  // Load actual attendance records AND pending counts from MongoDB
   const fetchAll = async () => {
     try {
-      const [attRes, profileRes] = await Promise.all([
+      const [attRes, profileRes, reqRes, docsRes] = await Promise.all([
         api.get('/ojt/my-attendance'),
-        api.get('/profile')
+        api.get('/profile'),
+        api.get('/documents/requirements'),
+        api.get('/documents/my-documents')
       ]);
 
       const data = attRes.data;
@@ -49,10 +52,12 @@ export default function StudentDashboard() {
         records: data.attendance || []
       });
 
-      // Set real pending counts from the backend
       if (profileRes.data.pendingSummary) {
         setPendingSummary(profileRes.data.pendingSummary);
       }
+
+      setRequiredDocs(reqRes.data.requirements || []);
+      setMyDocs(docsRes.data.documents || []);
 
       setError('');
     } catch (err) {
@@ -71,12 +76,10 @@ export default function StudentDashboard() {
     fetchAll();
   }, []);
 
-  // Find an unfinished attendance session
   const activeSession = attendance.records.find(
-    record => !record.timeOut
+    record => !record.timeOut && record.status !== 'Rejected'
   );
 
-  // Time In / Time Out using backend API
   const handleTime = async (action) => {
     try {
       setBusy(true);
@@ -90,9 +93,7 @@ export default function StudentDashboard() {
         addNotification('You have successfully timed out.', 'success');
       }
 
-      // Refresh attendance and pending counts from MongoDB
       await fetchAll();
-
     } catch (err) {
       console.error('Attendance action error:', err);
 
@@ -105,7 +106,6 @@ export default function StudentDashboard() {
     }
   };
 
-  // Philippine date for dashboard calculations
   const getToday = () =>
     new Intl.DateTimeFormat('en-CA', {
       timeZone: 'Asia/Manila',
@@ -116,31 +116,42 @@ export default function StudentDashboard() {
 
   const todayStr = getToday();
 
-  // Weekly attendance chart
+  const nonRejectedRecords = attendance.records.filter(
+    r => r.status !== 'Rejected'
+  );
+
   const last7Days = Array.from({ length: 7 }, (_, i) => {
     const d = new Date();
     d.setDate(d.getDate() - (6 - i));
 
     const dateStr = format(d, 'yyyy-MM-dd');
 
-    const record = attendance.records.find(
-      r => r.attendanceDate === dateStr
-    );
+    const dayHours = nonRejectedRecords
+      .filter(r => r.attendanceDate === dateStr)
+      .reduce((sum, r) => sum + (r.totalHours || 0), 0);
 
     return {
       day: format(d, 'EEE'),
-      hours: record?.totalHours || 0
+      hours: Number(dayHours.toFixed(2))
     };
   });
 
-  const totalHours = attendance.summary?.totalHours || 0;
+  const computedNonRejectedHours = nonRejectedRecords.reduce(
+    (sum, r) => sum + (r.totalHours || 0),
+    0
+  );
+
+  const totalHours =
+    typeof attendance.summary?.totalHours === 'number'
+      ? attendance.summary.totalHours
+      : Number(computedNonRejectedHours.toFixed(2));
 
   const percent = Math.min(
     100,
     Math.round((totalHours / REQUIRED_HOURS) * 100)
   );
 
-  const todayRecords = attendance.records.filter(
+  const todayRecords = nonRejectedRecords.filter(
     r => r.attendanceDate === todayStr
   );
 
@@ -149,8 +160,24 @@ export default function StudentDashboard() {
     0
   );
 
-  // Count of approved docs (for the Docs tile)
-  const approvedDocsCount = pendingSummary.documents === 0 ? '0' : '?'; 
+  const docChecklist = requiredDocs.map((reqItem) => {
+    const submitted = myDocs.find(
+      (doc) =>
+        (doc.documentType || '').toLowerCase() ===
+        (reqItem.title || '').toLowerCase()
+    );
+    return {
+      id: reqItem._id,
+      title: reqItem.title,
+      dueDate: reqItem.dueDate,
+      status: submitted ? submitted.status : 'Missing'
+    };
+  });
+
+  const approvedDocsCount = docChecklist.filter(
+    (item) => item.status === 'Approved'
+  ).length;
+  const totalDocsCount = docChecklist.length;
 
   if (loading) {
     return (
@@ -252,13 +279,13 @@ export default function StudentDashboard() {
                 <FileText size={12} /> Docs
               </div>
               <p className="text-xl font-extrabold text-success">
-                {approvedDocsCount}/4
+                {approvedDocsCount}/{totalDocsCount}
               </p>
             </div>
 
             {/* PENDING TILE WITH POPOVER */}
             <div className="relative">
-              <div 
+              <div
                 onClick={() => setShowPendingPopover(!showPendingPopover)}
                 className="rounded-2xl bg-orange-50 p-3 cursor-pointer hover:bg-orange-100 transition border border-orange-100 h-full"
               >
@@ -270,12 +297,10 @@ export default function StudentDashboard() {
                 </p>
               </div>
 
-              {/* THE POPOVER CARD */}
               {showPendingPopover && (
                 <>
-                  {/* Click outside to close */}
                   <div className="fixed inset-0 z-40" onClick={() => setShowPendingPopover(false)}></div>
-                  
+
                   <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 bg-white rounded-2xl shadow-xl border border-border p-4 z-50 animate-in fade-in zoom-in-95">
                     <div className="flex items-center justify-between mb-3 border-b border-border pb-2">
                       <h4 className="text-sm font-bold text-text flex items-center gap-2">
@@ -283,7 +308,7 @@ export default function StudentDashboard() {
                       </h4>
                       <button onClick={() => setShowPendingPopover(false)} className="text-muted hover:text-text"><X size={14}/></button>
                     </div>
-                    
+
                     {pendingSummary.total === 0 ? (
                       <p className="text-xs text-muted text-center py-2">All caught up! No pending items.</p>
                     ) : (
@@ -308,7 +333,6 @@ export default function StudentDashboard() {
                         )}
                       </div>
                     )}
-                    {/* Little arrow pointing down */}
                     <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-4 h-4 bg-white border-b border-r border-border rotate-45"></div>
                   </div>
                 </>
@@ -417,28 +441,47 @@ export default function StudentDashboard() {
           </h3>
 
           <div className="space-y-2">
-            {[
-              'MOA',
-              'Insurance',
-              'Endorsement Letter',
-              'Medical Certificate'
-            ].map(type => (
-              <div
-                key={type}
-                className="flex items-center justify-between p-3 rounded-2xl bg-background"
-              >
-                <div className="flex items-center gap-2">
-                  <Circle size={16} className="text-muted" />
-                  <span className="text-xs font-medium text-text">
-                    {type}
+            {docChecklist.map((item) => {
+              const badgeClass =
+                item.status === 'Approved'
+                  ? 'bg-green-100 text-success'
+                  : item.status === 'Pending'
+                  ? 'bg-amber-100 text-warning'
+                  : item.status === 'Rejected'
+                  ? 'bg-red-100 text-danger'
+                  : 'bg-gray-100 text-muted';
+
+              return (
+                <div
+                  key={item.id}
+                  className="flex items-center justify-between p-3 rounded-2xl bg-background"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    {item.status === 'Approved' ? (
+                      <CheckCircle2 size={16} className="text-success shrink-0" />
+                    ) : (
+                      <Circle size={16} className="text-muted shrink-0" />
+                    )}
+                    <div className="truncate">
+                      <span className="text-xs font-medium text-text block truncate">
+                        {item.title}
+                      </span>
+                      {item.dueDate && (
+                        <span className="text-[10px] text-muted block">
+                          Due {format(new Date(item.dueDate), 'MMM d, yyyy')}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <span
+                    className={`text-[10px] font-bold px-2 py-1 rounded-full shrink-0 ${badgeClass}`}
+                  >
+                    {item.status}
                   </span>
                 </div>
-
-                <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-gray-100 text-muted">
-                  Missing
-                </span>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 

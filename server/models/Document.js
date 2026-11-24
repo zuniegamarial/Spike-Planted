@@ -1,4 +1,3 @@
-
 const mongoose = require('mongoose');
 
 const documentSchema = new mongoose.Schema(
@@ -11,13 +10,7 @@ const documentSchema = new mongoose.Schema(
 
     documentType: {
       type: String,
-      enum: [
-        'MOA',
-        'Insurance',
-        'Endorsement Letter',
-        'Medical Certificate',
-        'Other'
-      ],
+      trim: true,
       required: true
     },
 

@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
@@ -30,14 +29,14 @@ export default function StudentDetails() {
   const [statusMessage, setStatusMessage] = useState('');
   const [statusError, setStatusError] = useState('');
 
-  const fetchStudentRecord = async () => {
+  const fetchStudentRecord = async ({ silent = false } = {}) => {
     try {
-      setLoading(true);
-      setError('');
+      if (!silent) {
+        setLoading(true);
+        setError('');
+      }
 
-      const { data } = await api.get(
-        `/coordinator/students/${studentId}`
-      );
+      const { data } = await api.get(`/coordinator/students/${studentId}`);
 
       setStudent(data.student);
       setSummary(data.summary || {});
@@ -47,12 +46,15 @@ export default function StudentDetails() {
     } catch (err) {
       console.error('Failed to load student record:', err);
 
-      setError(
-        err.response?.data?.message ||
-        'Unable to load student record.'
-      );
+      if (!silent) {
+        setError(
+          err.response?.data?.message || 'Unable to load student record.'
+        );
+      }
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   };
 
@@ -60,7 +62,6 @@ export default function StudentDetails() {
     fetchStudentRecord();
   }, [studentId]);
 
-  // UPDATE STUDENT ACCOUNT STATUS
   const handleStatusChange = async (newStatus) => {
     try {
       setStatusLoading(true);
@@ -74,13 +75,12 @@ export default function StudentDetails() {
 
       setStudent(data.student);
       setStatusMessage(data.message);
-
     } catch (err) {
       console.error('Failed to update student status:', err);
 
       setStatusError(
         err.response?.data?.message ||
-        'Failed to update student account status.'
+          'Failed to update student account status.'
       );
     } finally {
       setStatusLoading(false);
@@ -134,10 +134,7 @@ export default function StudentDetails() {
   const getFileUrl = (filePath) => {
     if (!filePath) return '#';
 
-    if (
-      filePath.startsWith('http://') ||
-      filePath.startsWith('https://')
-    ) {
+    if (filePath.startsWith('http://') || filePath.startsWith('https://')) {
       return filePath;
     }
 
@@ -160,6 +157,7 @@ export default function StudentDetails() {
     return (
       <div className="space-y-4">
         <button
+          type="button"
           onClick={() => navigate('/students')}
           className="flex items-center gap-2 text-primary font-semibold"
         >
@@ -167,12 +165,11 @@ export default function StudentDetails() {
           Back to Students
         </button>
 
-        <div className="bg-red-50 text-red-600 p-4 rounded-xl">
-          {error}
-        </div>
+        <div className="bg-red-50 text-red-600 p-4 rounded-xl">{error}</div>
 
         <button
-          onClick={fetchStudentRecord}
+          type="button"
+          onClick={() => fetchStudentRecord()}
           className="px-4 py-2 bg-primary text-white rounded-xl"
         >
           Try Again
@@ -183,18 +180,14 @@ export default function StudentDetails() {
 
   if (!student) return null;
 
-  const progress = Math.min(
-    ((summary.totalHours || 0) / 486) * 100,
-    100
-  );
+  const progress = Math.min(((summary.totalHours || 0) / 486) * 100, 100);
 
   return (
     <div className="space-y-6">
-
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:justify-between gap-4">
         <div>
           <button
+            type="button"
             onClick={() => navigate('/students')}
             className="flex items-center gap-2 text-primary font-semibold mb-4"
           >
@@ -202,9 +195,7 @@ export default function StudentDetails() {
             Back to Students
           </button>
 
-          <h1 className="text-3xl font-extrabold text-text">
-            Student Details
-          </h1>
+          <h1 className="text-3xl font-extrabold text-text">Student Details</h1>
 
           <p className="text-sm text-muted mt-1">
             View student information and OJT progress
@@ -212,7 +203,8 @@ export default function StudentDetails() {
         </div>
 
         <button
-          onClick={fetchStudentRecord}
+          type="button"
+          onClick={() => fetchStudentRecord()}
           className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-white shadow-card text-primary"
         >
           <RefreshCw size={17} />
@@ -220,7 +212,6 @@ export default function StudentDetails() {
         </button>
       </div>
 
-      {/* Student Information */}
       <div className="bg-white rounded-3xl shadow-card p-6">
         <div className="flex items-center gap-4 mb-6">
           <div className="w-14 h-14 rounded-2xl bg-primary-light flex items-center justify-center text-primary">
@@ -248,26 +239,23 @@ export default function StudentDetails() {
 
           <div>
             <p className="text-xs text-muted">Program</p>
-            <p className="font-semibold text-text">
-              {student.program || 'N/A'}
-            </p>
+            <p className="font-semibold text-text">{student.program || 'N/A'}</p>
           </div>
 
           <div>
             <p className="text-xs text-muted">Account Status</p>
             <span
-              className={`inline-block mt-1 px-3 py-1 rounded-full text-xs font-bold ${getStatusStyle(student.status)}`}
+              className={`inline-block mt-1 px-3 py-1 rounded-full text-xs font-bold ${getStatusStyle(
+                student.status
+              )}`}
             >
               {student.status || 'Unknown'}
             </span>
           </div>
         </div>
 
-        {/* Account Activation Controls */}
         <div className="border-t border-border mt-6 pt-5">
-          <h3 className="font-bold text-text mb-2">
-            Account Management
-          </h3>
+          <h3 className="font-bold text-text mb-2">Account Management</h3>
 
           <p className="text-sm text-muted mb-4">
             Manage this student's access to the OJT Tracker.
@@ -287,6 +275,7 @@ export default function StudentDetails() {
 
           {student.status === 'Active' && (
             <button
+              type="button"
               onClick={() => handleStatusChange('Inactive')}
               disabled={statusLoading}
               className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-red-100 text-red-700 font-semibold hover:bg-red-200 disabled:opacity-50 transition"
@@ -296,9 +285,9 @@ export default function StudentDetails() {
             </button>
           )}
 
-          {(student.status === 'Pending' ||
-            student.status === 'Inactive') && (
+          {(student.status === 'Pending' || student.status === 'Inactive') && (
             <button
+              type="button"
               onClick={() => handleStatusChange('Active')}
               disabled={statusLoading}
               className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-green-100 text-green-700 font-semibold hover:bg-green-200 disabled:opacity-50 transition"
@@ -316,9 +305,7 @@ export default function StudentDetails() {
         </div>
       </div>
 
-      {/* OJT Summary */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-
         <div className="bg-white rounded-2xl shadow-card p-5">
           <Clock className="text-primary mb-3" size={24} />
           <p className="text-sm text-muted">Approved OJT Hours</p>
@@ -353,7 +340,6 @@ export default function StudentDetails() {
         </div>
       </div>
 
-      {/* OJT Progress */}
       <div className="bg-white rounded-2xl shadow-card p-6">
         <div className="flex justify-between items-center mb-3">
           <h2 className="font-bold text-text">OJT Progress</h2>
@@ -370,15 +356,13 @@ export default function StudentDetails() {
         </div>
 
         <p className="text-xs text-muted mt-2">
-          {(summary.totalHours || 0).toFixed(2)} approved hours / 486 required hours
+          {(summary.totalHours || 0).toFixed(2)} approved hours / 486 required
+          hours
         </p>
       </div>
 
-      {/* Attendance History */}
       <div className="bg-white rounded-3xl shadow-card p-6">
-        <h2 className="text-xl font-bold text-text mb-5">
-          Attendance History
-        </h2>
+        <h2 className="text-xl font-bold text-text mb-5">Attendance History</h2>
 
         {attendance.length === 0 ? (
           <p className="text-muted text-center py-6">
@@ -399,39 +383,45 @@ export default function StudentDetails() {
               </thead>
 
               <tbody className="divide-y divide-border">
-                {attendance.map((record) => (
-                  <tr key={record._id}>
-                    <td className="p-3">
-                      {formatDate(record.attendanceDate || record.date)}
-                    </td>
-                    <td className="p-3">
-                      {formatTime(record.timeIn)}
-                    </td>
-                    <td className="p-3">
-                      {formatTime(record.timeOut)}
-                    </td>
-                    <td className="p-3 font-semibold">
-                      {(record.totalHours || 0).toFixed(2)}
-                    </td>
-                    <td className="p-3">
-                      <span
-                        className={`px-3 py-1 rounded-full text-xs font-bold ${getStatusStyle(record.status)}`}
+                {attendance.map((record) => {
+                  const isRejected = record.status === 'Rejected';
+
+                  return (
+                    <tr
+                      key={record._id}
+                      className={isRejected ? 'bg-red-50/40' : ''}
+                    >
+                      <td className="p-3">
+                        {formatDate(record.attendanceDate || record.date)}
+                      </td>
+                      <td className="p-3">{formatTime(record.timeIn)}</td>
+                      <td className="p-3">{formatTime(record.timeOut)}</td>
+                      <td
+                        className={`p-3 font-semibold ${
+                          isRejected ? 'line-through text-red-600' : ''
+                        }`}
                       >
-                        {record.status}
-                      </span>
-                    </td>
-                    <td className="p-3 text-muted">
-                      {record.remarks || '—'}
-                    </td>
-                  </tr>
-                ))}
+                        {(record.totalHours || 0).toFixed(2)}
+                      </td>
+                      <td className="p-3">
+                        <span
+                          className={`px-3 py-1 rounded-full text-xs font-bold ${getStatusStyle(
+                            record.status
+                          )}`}
+                        >
+                          {record.status}
+                        </span>
+                      </td>
+                      <td className="p-3 text-muted">{record.remarks || '—'}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         )}
       </div>
 
-      {/* Weekly Journals */}
       <div className="bg-white rounded-3xl shadow-card p-6">
         <h2 className="text-xl font-bold text-text mb-5">
           Weekly Journal History
@@ -448,13 +438,14 @@ export default function StudentDetails() {
                 key={journal._id}
                 className="border border-border rounded-2xl p-5 space-y-3"
               >
-                <div className="flex flex-wrap justify-between gap-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
                   <h3 className="font-bold text-text">
                     Week {journal.weekNumber}
                   </h3>
-
                   <span
-                    className={`px-3 py-1 rounded-full text-xs font-bold ${getStatusStyle(journal.status)}`}
+                    className={`px-3 py-1 rounded-full text-xs font-bold ${getStatusStyle(
+                      journal.status
+                    )}`}
                   >
                     {journal.status}
                   </span>
@@ -489,12 +480,8 @@ export default function StudentDetails() {
 
                 {journal.feedback && (
                   <div className="bg-background rounded-xl p-3">
-                    <p className="font-semibold text-sm">
-                      Coordinator Feedback
-                    </p>
-                    <p className="text-sm text-muted">
-                      {journal.feedback}
-                    </p>
+                    <p className="font-semibold text-sm">Review Feedback</p>
+                    <p className="text-sm text-muted">{journal.feedback}</p>
                   </div>
                 )}
               </div>
@@ -503,11 +490,8 @@ export default function StudentDetails() {
         )}
       </div>
 
-      {/* Document History */}
       <div className="bg-white rounded-3xl shadow-card p-6">
-        <h2 className="text-xl font-bold text-text mb-5">
-          Document History
-        </h2>
+        <h2 className="text-xl font-bold text-text mb-5">Document History</h2>
 
         {documents.length === 0 ? (
           <p className="text-muted text-center py-6">
@@ -530,25 +514,19 @@ export default function StudentDetails() {
               <tbody className="divide-y divide-border">
                 {documents.map((doc) => (
                   <tr key={doc._id}>
-                    <td className="p-3 font-semibold">
-                      {doc.documentType}
-                    </td>
-                    <td className="p-3 text-muted">
-                      {doc.fileName}
-                    </td>
-                    <td className="p-3">
-                      {formatDate(doc.createdAt)}
-                    </td>
+                    <td className="p-3 font-semibold">{doc.documentType}</td>
+                    <td className="p-3 text-muted">{doc.fileName}</td>
+                    <td className="p-3">{formatDate(doc.createdAt)}</td>
                     <td className="p-3">
                       <span
-                        className={`px-3 py-1 rounded-full text-xs font-bold ${getStatusStyle(doc.status)}`}
+                        className={`px-3 py-1 rounded-full text-xs font-bold ${getStatusStyle(
+                          doc.status
+                        )}`}
                       >
                         {doc.status}
                       </span>
                     </td>
-                    <td className="p-3 text-muted">
-                      {doc.remarks || '—'}
-                    </td>
+                    <td className="p-3 text-muted">{doc.remarks || '—'}</td>
                     <td className="p-3">
                       {doc.filePath && (
                         <a
@@ -568,7 +546,6 @@ export default function StudentDetails() {
           </div>
         )}
       </div>
-
     </div>
   );
 }

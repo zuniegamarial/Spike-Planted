@@ -5,11 +5,45 @@ const {
   uploadDocument,
   getMyDocuments,
   getAllDocuments,
-  reviewDocument
+  reviewDocument,
+  getRequiredDocuments,
+  createRequiredDocument,
+  toggleRequiredDocument,
+  getActiveRequirements
 } = require('../controllers/documentController');
 
 const { protect, authorize } = require('../middleware/authMiddleware');
 const upload = require('../middleware/uploadMiddleware');
+
+// Company / Staff / Coordinator / Admin: Manage required documents
+router.get(
+  '/requirements/manage',
+  protect,
+  authorize('staff', 'coordinator', 'admin'),
+  getRequiredDocuments
+);
+
+router.post(
+  '/requirements',
+  protect,
+  authorize('staff', 'coordinator', 'admin'),
+  createRequiredDocument
+);
+
+router.patch(
+  '/requirements/:id/toggle',
+  protect,
+  authorize('staff', 'coordinator', 'admin'),
+  toggleRequiredDocument
+);
+
+// Student: Get active required documents to pass
+router.get(
+  '/requirements',
+  protect,
+  authorize('student'),
+  getActiveRequirements
+);
 
 // Student: Upload a document
 router.post(

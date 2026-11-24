@@ -1,4 +1,3 @@
-
 const express = require('express');
 const router = express.Router();
 
@@ -71,7 +70,7 @@ router.get(
 router.patch(
   '/:id/review',
   protect,
-  authorize('coordinator', 'admin'),
+  authorize('admin'),
   reviewJournal
 );
 

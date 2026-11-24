@@ -1,4 +1,3 @@
-
 const OjtRecord = require('../models/OjtRecord');
 
 // Get today's date in Philippine time (YYYY-MM-DD)
@@ -35,11 +34,11 @@ exports.getMyAttendance = async (req, res) => {
       student: studentId
     }).sort({ date: -1 });
 
-    const completedRecords = records.filter(
-      (record) => record.timeOut != null
+    const validHourRecords = records.filter(
+      (record) => record.timeOut != null && record.status !== 'Rejected'
     );
 
-    const totalHours = completedRecords.reduce(
+    const totalHours = validHourRecords.reduce(
       (sum, record) => sum + (record.totalHours || 0),
       0
     );
@@ -49,12 +48,11 @@ exports.getMyAttendance = async (req, res) => {
       count: records.length,
       summary: {
         totalDays: records.length,
-        completedDays: completedRecords.length,
+        completedDays: validHourRecords.length,
         totalHours: Number(totalHours.toFixed(2))
       },
       attendance: records
     });
-
   } catch (error) {
     console.error('Get attendance error:', error.message);
 
@@ -116,7 +114,6 @@ exports.timeIn = async (req, res) => {
       message: 'Time-in recorded successfully!',
       attendance: record
     });
-
   } catch (error) {
     if (error.code === 11000) {
       return res.status(409).json({
@@ -203,7 +200,6 @@ exports.timeOut = async (req, res) => {
       message: 'Time-out recorded successfully!',
       attendance: updatedRecord
     });
-
   } catch (error) {
     console.error('Time-out error:', error.message);
 

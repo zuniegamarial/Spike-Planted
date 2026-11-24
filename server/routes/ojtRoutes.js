@@ -1,4 +1,3 @@
-
 const express = require('express');
 const router = express.Router();
 
@@ -7,6 +6,10 @@ const {
   timeIn,
   timeOut
 } = require('../controllers/ojtController');
+
+const {
+  reviewAttendance
+} = require('../controllers/coordinatorController');
 
 const {
   protect,
@@ -35,6 +38,14 @@ router.post(
   protect,
   authorize('student'),
   timeOut
+);
+
+// Admin: Approve or reject an attendance record
+router.patch(
+  '/:id/review',
+  protect,
+  authorize('admin'),
+  reviewAttendance
 );
 
 module.exports = router;

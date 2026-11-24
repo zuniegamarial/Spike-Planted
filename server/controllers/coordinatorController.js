@@ -14,13 +14,15 @@ exports.getAllStudents = async (req, res) => {
     const students = await Student.find().sort({ lastName: 1 });
 
     // Fetch the avatar for each student from the User collection
-    const studentsWithAvatars = await Promise.all(students.map(async (student) => {
-      const user = await User.findOne({ email: student.email }).select('avatar');
-      return {
-        ...student.toObject(),
-        avatar: user ? user.avatar : ""
-      };
-    }));
+    const studentsWithAvatars = await Promise.all(
+      students.map(async (student) => {
+        const user = await User.findOne({ email: student.email }).select('avatar');
+        return {
+          ...student.toObject(),
+          avatar: user ? user.avatar : ''
+        };
+      })
+    );
 
     return res.status(200).json({
       success: true,
@@ -67,7 +69,7 @@ exports.getStudentRecord = async (req, res) => {
     ]);
 
     const totalHours = attendance
-      .filter(record => record.timeOut && record.status === 'Approved')
+      .filter((record) => record.timeOut && record.status === 'Approved')
       .reduce((total, record) => total + (record.totalHours || 0), 0);
 
     return res.status(200).json({
@@ -94,12 +96,13 @@ exports.getStudentRecord = async (req, res) => {
 };
 
 // ─────────────────────────────────────────────
-// COORDINATOR: REVIEW WEEKLY JOURNAL
+// REVIEW WEEKLY JOURNAL
 // ─────────────────────────────────────────────
 exports.reviewJournal = async (req, res) => {
   try {
     const { id } = req.params;
-    const { status, feedback } = req.body;
+    const status = String(req.body?.status || '').trim();
+    const feedback = String(req.body?.feedback || '').trim();
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({
@@ -115,38 +118,40 @@ exports.reviewJournal = async (req, res) => {
       });
     }
 
-    if (status === 'Rejected' && (!feedback || !feedback.trim())) {
+    if (status === 'Rejected' && !feedback) {
       return res.status(400).json({
         success: false,
         message: 'Feedback is required when rejecting a journal.'
       });
     }
 
-    const journal = await WeeklyJournal.findOneAndUpdate(
-      {
-        _id: id,
-        status: 'Submitted'
-      },
-      {
-        $set: {
-          status,
-          feedback: (feedback || '').trim(),
-          reviewedBy: req.user._id,
-          reviewedAt: new Date()
-        }
-      },
-      {
-        new: true,
-        runValidators: true
-      }
-    ).populate('student', 'studentNumber firstName lastName program');
+    const journal = await WeeklyJournal.findById(id);
 
     if (!journal) {
       return res.status(404).json({
         success: false,
-        message: 'Submitted journal not found. It may already have been reviewed.'
+        message: 'Weekly journal not found.'
       });
     }
+
+    const currentStatus = String(journal.status || '').toLowerCase();
+    if (!['submitted', 'pending'].includes(currentStatus)) {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot review journal with status "${journal.status}".`
+      });
+    }
+
+    journal.status = status;
+    if (feedback) {
+      journal.feedback = feedback;
+    } else if (status === 'Approved' && !journal.feedback) {
+      journal.feedback = 'Journal approved.';
+    }
+    journal.reviewedBy = req.user?._id || null;
+    journal.reviewedAt = new Date();
+
+    await journal.save();
 
     return res.status(200).json({
       success: true,
@@ -164,12 +169,13 @@ exports.reviewJournal = async (req, res) => {
 };
 
 // ─────────────────────────────────────────────
-// COORDINATOR: REVIEW ATTENDANCE
+// REVIEW ATTENDANCE
 // ─────────────────────────────────────────────
 exports.reviewAttendance = async (req, res) => {
   try {
     const { id } = req.params;
-    const { status, remarks } = req.body;
+    const status = String(req.body?.status || '').trim();
+    const remarks = String(req.body?.remarks || '').trim();
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({
@@ -185,39 +191,48 @@ exports.reviewAttendance = async (req, res) => {
       });
     }
 
-    if (status === 'Rejected' && (!remarks || !remarks.trim())) {
+    if (status === 'Rejected' && !remarks) {
       return res.status(400).json({
         success: false,
         message: 'Remarks are required when rejecting attendance.'
       });
     }
 
-    const attendance = await OjtRecord.findOneAndUpdate(
-      {
-        _id: id,
-        status: 'Pending',
-        timeOut: { $ne: null }
-      },
-      {
-        $set: {
-          status,
-          remarks: (remarks || '').trim(),
-          reviewedBy: req.user._id,
-          reviewedAt: new Date()
-        }
-      },
-      {
-        new: true,
-        runValidators: true
-      }
-    ).populate('student', 'studentNumber firstName lastName program');
+    const existing = await OjtRecord.findById(id);
 
-    if (!attendance) {
+    if (!existing) {
       return res.status(404).json({
         success: false,
-        message: 'Pending completed attendance record not found. It may already have been reviewed.'
+        message: 'Attendance record not found.'
       });
     }
+
+    if (!existing.timeOut) {
+      return res.status(400).json({
+        success: false,
+        message: 'Student must time out before attendance can be reviewed.'
+      });
+    }
+
+    const currentStatus = String(existing.status || '').toLowerCase();
+    if (!['pending', 'rejected'].includes(currentStatus)) {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot review attendance with status "${existing.status}".`
+      });
+    }
+
+    existing.status = status;
+    existing.remarks = remarks || existing.remarks || '';
+    existing.reviewedBy = req.user?._id || null;
+    existing.reviewedAt = new Date();
+
+    await existing.save();
+
+    const attendance = await OjtRecord.findById(existing._id).populate(
+      'student',
+      'studentNumber firstName lastName program'
+    );
 
     return res.status(200).json({
       success: true,
@@ -278,7 +293,7 @@ exports.getDashboardSummary = async (req, res) => {
     ]);
 
     const completedOjt = approvedHours.filter(
-      record => record.totalHours >= 486
+      (record) => record.totalHours >= 486
     ).length;
 
     return res.status(200).json({
@@ -395,7 +410,6 @@ exports.updateStudentStatus = async (req, res) => {
       message: `Student account ${status.toLowerCase()} successfully.`,
       student
     });
-
   } catch (error) {
     console.error('Update student status error:', error.message);
 
@@ -412,7 +426,7 @@ exports.updateStudentStatus = async (req, res) => {
 exports.getPendingAccounts = async (req, res) => {
   try {
     const pendingUsers = await User.find({ isActive: false }).select('-password');
-    
+
     return res.status(200).json({
       success: true,
       count: pendingUsers.length,
@@ -420,9 +434,9 @@ exports.getPendingAccounts = async (req, res) => {
     });
   } catch (error) {
     console.error('Get pending accounts error:', error.message);
-    return res.status(500).json({ 
-      success: false, 
-      message: 'Failed to retrieve pending accounts.' 
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve pending accounts.'
     });
   }
 };
@@ -433,10 +447,10 @@ exports.getPendingAccounts = async (req, res) => {
 exports.approveAccount = async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     const user = await User.findByIdAndUpdate(
-      id, 
-      { $set: { isActive: true } }, 
+      id,
+      { $set: { isActive: true } },
       { new: true }
     ).select('-password');
 
@@ -451,9 +465,9 @@ exports.approveAccount = async (req, res) => {
     });
   } catch (error) {
     console.error('Approve account error:', error.message);
-    return res.status(500).json({ 
-      success: false, 
-      message: 'Failed to approve account.' 
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to approve account.'
     });
   }
 };

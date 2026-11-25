@@ -1,24 +1,36 @@
-
 const mongoose = require('mongoose');
 
 const Student = require('../models/Student');
 const OjtRecord = require('../models/OjtRecord');
 const WeeklyJournal = require('../models/WeeklyJournal');
 const Document = require('../models/Document');
+const Company = require('../models/Company'); // <-- Added Company import
 
 // ─────────────────────────────────────────────
-// COORDINATOR: GET ALL STUDENTS
+// COORDINATOR: GET ALL STUDENTS (With Assigned Company)
 // ─────────────────────────────────────────────
 exports.getAllStudents = async (req, res) => {
   try {
-    const students = await Student.find()
-      .populate('companyId', 'name contactPerson email')
-      .sort({ lastName: 1 });
+    const students = await Student.find().sort({ lastName: 1 });
+
+    // Fetch the assigned company name for each student
+    const studentsWithCompany = await Promise.all(students.map(async (student) => {
+      let companyName = null;
+      if (student.companyId) {
+        const company = await Company.findById(student.companyId).select('name');
+        if (company) companyName = company.name;
+      }
+      
+      return {
+        ...student.toObject(),
+        company: companyName // <-- Add company name to the response
+      };
+    }));
 
     return res.status(200).json({
       success: true,
-      count: students.length,
-      students
+      count: studentsWithCompany.length,
+      students: studentsWithCompany
     });
   } catch (error) {
     console.error('Get all students error:', error.message);
@@ -60,7 +72,6 @@ exports.getStudentRecord = async (req, res) => {
       Document.find({ student: studentId }).sort({ createdAt: -1 })
     ]);
 
-    // Only coordinator-approved attendance counts toward OJT hours.
     const totalHours = attendance
       .filter(record => record.timeOut && record.status === 'Approved')
       .reduce((total, record) => total + (record.totalHours || 0), 0);
@@ -142,8 +153,6 @@ exports.reviewJournal = async (req, res) => {
       reviewedAt: new Date()
     };
 
-    // Return rejected journals to the student for correction.
-    // The next submission must go through supervisor review again.
     if (status === 'Rejected') {
       updateFields.supervisorStatus = 'Pending';
       updateFields.supervisorReviewedBy = null;
@@ -240,8 +249,6 @@ exports.reviewAttendance = async (req, res) => {
       });
     }
 
-    // Coordinator can only review completed attendance
-    // already approved by the company supervisor.
     const attendance = await OjtRecord.findOneAndUpdate(
       {
         _id: id,
@@ -304,13 +311,11 @@ exports.getDashboardSummary = async (req, res) => {
     ] = await Promise.all([
       Student.countDocuments(),
 
-      // Only supervisor-approved journals await coordinator review.
       WeeklyJournal.countDocuments({
         status: 'Submitted',
         supervisorStatus: 'Approved'
       }),
 
-      // Only supervisor-approved attendance awaits coordinator review.
       OjtRecord.countDocuments({
         status: 'Pending',
         supervisorStatus: 'Approved',
@@ -337,7 +342,6 @@ exports.getDashboardSummary = async (req, res) => {
       ])
     ]);
 
-    // OJT completion requirement: 486 hours.
     const completedOjt = approvedHours.filter(
       record => record.totalHours >= 486
     ).length;

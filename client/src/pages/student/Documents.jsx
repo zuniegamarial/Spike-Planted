@@ -1,6 +1,12 @@
-
 import { useEffect, useRef, useState } from 'react';
-import { FileText, Upload, Calendar, AlertCircle } from 'lucide-react';
+import {
+  FileText,
+  Upload,
+  Calendar,
+  AlertCircle,
+  CheckCircle2,
+  Circle
+} from 'lucide-react';
 import { format } from 'date-fns';
 import { api, getFileUrl } from '../../api/axios';
 
@@ -11,6 +17,7 @@ export default function Documents() {
   const [uploading, setUploading] = useState(false);
   const [selectedType, setSelectedType] = useState('');
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
   const fileRef = useRef(null);
 
   const fetchData = async () => {
@@ -44,7 +51,7 @@ export default function Documents() {
       console.error('Failed to load documents:', err);
       setError(
         err.response?.data?.message ||
-        'Unable to load your documents and requirements.'
+          'Unable to load your documents and requirements.'
       );
     } finally {
       setLoading(false);
@@ -55,18 +62,29 @@ export default function Documents() {
     fetchData();
   }, []);
 
+  const getStatusForRequirement = (title) => {
+    const matching = documents.filter(
+      (doc) => (doc.documentType || '').toLowerCase() === title.toLowerCase()
+    );
+
+    if (matching.some((doc) => doc.status === 'Approved')) return 'Approved';
+    if (matching.some((doc) => doc.status === 'Pending')) return 'Pending';
+    if (matching.some((doc) => doc.status === 'Rejected')) return 'Rejected';
+    return 'Missing';
+  };
+
   const handleUpload = async (e) => {
     e.preventDefault();
 
     const file = fileRef.current?.files?.[0];
 
     if (!selectedType) {
-      alert('There are currently no active document requirements.');
+      setError('There are currently no active document requirements.');
       return;
     }
 
     if (!file) {
-      alert('Please select a file.');
+      setError('Please select a file.');
       return;
     }
 
@@ -77,6 +95,7 @@ export default function Documents() {
     try {
       setUploading(true);
       setError('');
+      setSuccessMessage('');
 
       await api.post('/documents', formData, {
         headers: {
@@ -89,9 +108,9 @@ export default function Documents() {
       }
 
       await fetchData();
-      alert('Document uploaded successfully.');
+      setSuccessMessage('Document uploaded successfully.');
     } catch (err) {
-      alert(
+      setError(
         err.response?.data?.message || 'Document upload failed.'
       );
     } finally {
@@ -118,6 +137,12 @@ export default function Documents() {
         </p>
       </div>
 
+      {successMessage && (
+        <div className="rounded-xl bg-green-50 text-success p-4 text-sm font-medium">
+          {successMessage}
+        </div>
+      )}
+
       {error && (
         <div className="rounded-xl bg-red-50 text-red-700 p-4 text-sm flex items-center gap-2">
           <AlertCircle size={18} />
@@ -138,32 +163,62 @@ export default function Documents() {
           </p>
         ) : (
           <div className="space-y-3">
-            {requirements.map((requirement) => (
-              <div
-                key={requirement._id}
-                className="rounded-xl border border-border bg-background p-4"
-              >
-                <h3 className="font-bold text-sm text-text">
-                  {requirement.title}
-                </h3>
+            {requirements.map((requirement) => {
+              const status = getStatusForRequirement(requirement.title);
+              const isApproved = status === 'Approved';
+              const isPending = status === 'Pending';
+              const isRejected = status === 'Rejected';
 
-                {requirement.description && (
-                  <p className="text-xs text-muted mt-1">
-                    {requirement.description}
-                  </p>
-                )}
+              return (
+                <div
+                  key={requirement._id}
+                  className="rounded-xl border border-border bg-background p-4 flex items-start justify-between gap-4"
+                >
+                  <div>
+                    <div className="flex items-center gap-2">
+                      {isApproved ? (
+                        <CheckCircle2 size={16} className="text-success shrink-0" />
+                      ) : (
+                        <Circle size={16} className="text-muted shrink-0" />
+                      )}
+                      <h3 className="font-bold text-sm text-text">
+                        {requirement.title}
+                      </h3>
+                    </div>
 
-                {requirement.dueDate && (
-                  <p className="text-xs text-muted mt-2 flex items-center gap-1">
-                    <Calendar size={13} />
-                    Due: {format(
-                      new Date(requirement.dueDate),
-                      'MMM d, yyyy'
+                    {requirement.description && (
+                      <p className="text-xs text-muted mt-1 pl-6">
+                        {requirement.description}
+                      </p>
                     )}
-                  </p>
-                )}
-              </div>
-            ))}
+
+                    {requirement.dueDate && (
+                      <p className="text-xs text-muted mt-2 pl-6 flex items-center gap-1">
+                        <Calendar size={13} />
+                        Due: {format(
+                          new Date(requirement.dueDate),
+                          'MMM d, yyyy'
+                        )}
+                      </p>
+                    )}
+                  </div>
+
+                  <span
+                    className={`px-2.5 py-1 rounded-full text-[10px] font-bold shrink-0 ${
+                      isApproved
+                        ? 'bg-green-100 text-success'
+                        : isPending
+                          ? 'bg-amber-100 text-warning'
+                          : isRejected
+                            ? 'bg-red-100 text-danger'
+                            : 'bg-gray-100 text-muted'
+                    }`}
+                  >
+                    {status}
+                  </span>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>

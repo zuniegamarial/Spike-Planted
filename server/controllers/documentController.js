@@ -1,4 +1,3 @@
-
 const mongoose = require('mongoose');
 
 const Document = require('../models/Document');
@@ -123,8 +122,6 @@ exports.getRequiredDocuments = async (req, res) => {
 
     let requirements = customRequirements;
 
-    // Always show the five standard requirements to staff.
-    // Custom requirements are displayed alongside them.
     if (isStaff) {
       const defaultRequirements = createDefaultRequirements(
         req.user.companyId
@@ -188,7 +185,6 @@ exports.createRequiredDocument = async (req, res) => {
       });
     }
 
-    // Prevent duplicate custom requirements matching standard types.
     if (
       DEFAULT_REQUIREMENTS.some(
         (item) => item.toLowerCase() === trimmedTitle.toLowerCase()
@@ -203,10 +199,8 @@ exports.createRequiredDocument = async (req, res) => {
     let companyId;
 
     if (req.user.role === 'staff') {
-      // Staff can only post requirements for their own company.
       companyId = req.user.companyId;
     } else {
-      // Coordinator/admin must specify the target company.
       companyId = req.body.companyId || req.user.companyId;
     }
 
@@ -293,10 +287,6 @@ exports.toggleRequiredDocument = async (req, res) => {
       });
     }
 
-    // Standard default requirements cannot be toggled.
-    // They are virtual frontend objects, not database records.
-
-    // Staff cannot modify another company's requirements.
     if (
       req.user.role === 'staff' &&
       (
@@ -357,12 +347,10 @@ exports.getActiveRequirements = async (req, res) => {
       companyId: student.companyId
     };
 
-    // Always include all five standard requirements.
     const defaultRequirements = createDefaultRequirements(
       student.companyId
     );
 
-    // Add only active custom requirements belonging to this company.
     const customRequirements = await RequiredDocument.find({
       ...companyFilter,
       isActive: true
@@ -427,12 +415,9 @@ exports.uploadDocument = async (req, res) => {
       });
     }
 
-    // Standard requirements are always available.
     const isDefaultRequirement =
       DEFAULT_REQUIREMENTS.includes(documentType);
 
-    // Custom requirements must be active and belong to
-    // the student's assigned company.
     const customRequirement = isDefaultRequirement
       ? null
       : await RequiredDocument.findOne({
@@ -506,7 +491,7 @@ exports.getMyDocuments = async (req, res) => {
 };
 
 // ============================================================
-// COORDINATOR / ADMIN: VIEW ALL DOCUMENTS
+// STAFF / COORDINATOR / ADMIN: VIEW DOCUMENTS
 // ============================================================
 
 exports.getAllDocuments = async (req, res) => {
@@ -518,13 +503,25 @@ exports.getAllDocuments = async (req, res) => {
     if (status) filter.status = status;
     if (documentType) filter.documentType = documentType;
 
-    const documents = await Document.find(filter)
+    const rawDocuments = await Document.find(filter)
       .populate(
         'student',
         'studentNumber firstName lastName program companyId'
       )
       .populate('reviewedBy', 'fullName email')
       .sort({ createdAt: -1 });
+
+    const documents =
+      req.user.role === 'staff'
+        ? rawDocuments.filter((doc) => {
+            if (!req.user.companyId || !doc.student?.companyId) {
+              return false;
+            }
+            return (
+              String(doc.student.companyId) === String(req.user.companyId)
+            );
+          })
+        : rawDocuments;
 
     return res.status(200).json({
       success: true,
@@ -542,7 +539,7 @@ exports.getAllDocuments = async (req, res) => {
 };
 
 // ============================================================
-// COORDINATOR / ADMIN: APPROVE OR REJECT A DOCUMENT
+// STAFF / COORDINATOR / ADMIN: APPROVE OR REJECT A DOCUMENT
 // ============================================================
 
 exports.reviewDocument = async (req, res) => {
@@ -571,35 +568,52 @@ exports.reviewDocument = async (req, res) => {
       });
     }
 
-    const doc = await Document.findOneAndUpdate(
-      { _id: id, status: 'Pending' },
-      {
-        $set: {
-          status,
-          remarks: (remarks || '').trim(),
-          reviewedBy: req.user._id,
-          reviewedAt: new Date()
-        }
-      },
-      {
-        new: true,
-        runValidators: true
-      }
-    ).populate(
+    const existingDoc = await Document.findById(id).populate(
       'student',
-      'studentNumber firstName lastName program'
+      'studentNumber firstName lastName program companyId'
     );
 
-    if (!doc) {
-      const exists = await Document.exists({ _id: id });
-
-      return res.status(exists ? 409 : 404).json({
+    if (!existingDoc) {
+      return res.status(404).json({
         success: false,
-        message: exists
-          ? 'Document has already been reviewed.'
-          : 'Document not found.'
+        message: 'Document not found.'
       });
     }
+
+    if (
+      req.user.role === 'staff' &&
+      (
+        !req.user.companyId ||
+        !existingDoc.student?.companyId ||
+        String(existingDoc.student.companyId) !== String(req.user.companyId)
+      )
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: 'You are not authorized to review documents for another company.'
+      });
+    }
+
+    if (existingDoc.status !== 'Pending') {
+      return res.status(409).json({
+        success: false,
+        message: 'Document has already been reviewed.'
+      });
+    }
+
+    existingDoc.status = status;
+    existingDoc.remarks = (remarks || '').trim();
+    existingDoc.reviewedBy = req.user._id;
+    existingDoc.reviewedAt = new Date();
+
+    await existingDoc.save();
+
+    const doc = await Document.findById(existingDoc._id)
+      .populate(
+        'student',
+        'studentNumber firstName lastName program companyId'
+      )
+      .populate('reviewedBy', 'fullName email');
 
     return res.status(200).json({
       success: true,

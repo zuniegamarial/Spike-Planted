@@ -1,4 +1,3 @@
-
 const express = require('express');
 const router = express.Router();
 
@@ -13,18 +12,10 @@ const {
   getActiveRequirements
 } = require('../controllers/documentController');
 
-const {
-  protect,
-  authorize
-} = require('../middleware/authMiddleware');
-
+const { protect, authorize } = require('../middleware/authMiddleware');
 const upload = require('../middleware/uploadMiddleware');
 
-// ============================================================
-// REQUIREMENT MANAGEMENT
-// ============================================================
-
-// Staff / Coordinator / Admin: View managed requirements
+// Staff / Coordinator / Admin: Manage required documents
 router.get(
   '/requirements/manage',
   protect,
@@ -32,7 +23,6 @@ router.get(
   getRequiredDocuments
 );
 
-// Staff / Coordinator / Admin: Create requirement
 router.post(
   '/requirements',
   protect,
@@ -40,7 +30,6 @@ router.post(
   createRequiredDocument
 );
 
-// Staff / Coordinator / Admin: Activate or hide requirement
 router.patch(
   '/requirements/:id/toggle',
   protect,
@@ -48,7 +37,7 @@ router.patch(
   toggleRequiredDocument
 );
 
-// Student: View active requirements for assigned company
+// Student: Get active required documents to pass
 router.get(
   '/requirements',
   protect,
@@ -56,11 +45,7 @@ router.get(
   getActiveRequirements
 );
 
-// ============================================================
-// STUDENT DOCUMENTS
-// ============================================================
-
-// Student: Upload document
+// Student: Upload a document
 router.post(
   '/',
   protect,
@@ -69,7 +54,7 @@ router.post(
   uploadDocument
 );
 
-// Student: View own documents
+// Student: Get my documents
 router.get(
   '/my-documents',
   protect,
@@ -77,23 +62,19 @@ router.get(
   getMyDocuments
 );
 
-// ============================================================
-// COORDINATOR / ADMIN DOCUMENT REVIEW
-// ============================================================
-
-// Coordinator/Admin: View all documents
+// Staff / Coordinator / Admin: Get documents
 router.get(
   '/',
   protect,
-  authorize('coordinator', 'admin'),
+  authorize('staff', 'coordinator', 'admin'),
   getAllDocuments
 );
 
-// Coordinator/Admin: Approve or reject document
+// Staff / Coordinator / Admin: Approve/Reject a document
 router.patch(
   '/:id/review',
   protect,
-  authorize('coordinator', 'admin'),
+  authorize('staff', 'coordinator', 'admin'),
   reviewDocument
 );
 

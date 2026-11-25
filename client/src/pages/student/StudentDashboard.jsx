@@ -1,25 +1,46 @@
 import { useEffect, useState } from 'react';
 import {
-  Play, Circle, Clock, Calendar, FileText, Star, Square
+  Play,
+  Circle,
+  Clock,
+  Calendar,
+  FileText,
+  Star,
+  Square,
+  CheckCircle2
 } from 'lucide-react';
 import {
-  LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  ResponsiveContainer,
+  Tooltip
 } from 'recharts';
 import { format } from 'date-fns';
 import { useAuth } from '../../context/AuthContext';
 import { useNotifications } from '../../context/NotificationContext';
-import { useTimer } from '../../context/TimerContext'; // <-- Added Timer Context
+import { useTimer } from '../../context/TimerContext';
 import { api } from '../../api/axios';
+
+const FALLBACK_DOC_TYPES = [
+  'MOA',
+  'Insurance',
+  'Endorsement Letter',
+  'Medical Certificate'
+];
 
 export default function StudentDashboard() {
   const { user } = useAuth();
   const { addNotification } = useNotifications();
-  const { fetchActiveSession } = useTimer(); // <-- Get the refresh function
+  const { fetchActiveSession } = useTimer();
 
   const [attendance, setAttendance] = useState({
     summary: null,
     records: []
   });
+  const [requirements, setRequirements] = useState([]);
+  const [myDocuments, setMyDocuments] = useState([]);
 
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -27,17 +48,26 @@ export default function StudentDashboard() {
 
   const REQUIRED_HOURS = 486;
 
-  // Load actual attendance records from MongoDB
   const fetchAll = async () => {
     try {
-      const response = await api.get('/ojt/my-attendance');
+      const [attRes, reqRes, docsRes] = await Promise.all([
+        api.get('/ojt/my-attendance'),
+        api.get('/documents/requirements').catch(() => ({ data: { requirements: [] } })),
+        api.get('/documents/my-documents').catch(() => ({ data: { documents: [] } }))
+      ]);
 
-      const data = response.data;
+      const data = attRes.data;
 
       setAttendance({
         summary: data.summary,
         records: data.attendance || []
       });
+
+      const activeReqs = (reqRes.data?.requirements || []).filter(
+        (item) => item.isActive !== false && item.title !== 'Other'
+      );
+      setRequirements(activeReqs);
+      setMyDocuments(docsRes.data?.documents || []);
 
       setError('');
     } catch (err) {
@@ -45,7 +75,7 @@ export default function StudentDashboard() {
 
       setError(
         err.response?.data?.message ||
-        'Unable to load attendance records.'
+          'Unable to load attendance records.'
       );
     } finally {
       setLoading(false);
@@ -56,18 +86,15 @@ export default function StudentDashboard() {
     fetchAll();
   }, []);
 
-  // Find an unfinished attendance session
   const activeSession = attendance.records.find(
-    record => !record.timeOut
+    (record) => !record.timeOut
   );
 
-  // Time In / Time Out using backend API
   const handleTime = async (action) => {
     try {
       setBusy(true);
       setError('');
 
-      // Get Manila time for the notification
       const manilaTime = new Intl.DateTimeFormat('en-US', {
         timeZone: 'Asia/Manila',
         hour: 'numeric',
@@ -77,31 +104,32 @@ export default function StudentDashboard() {
 
       if (action === 'time-in') {
         await api.post('/ojt/time-in');
-        addNotification(`You have successfully timed in at ${manilaTime}.`, 'success');
+        addNotification(
+          `You have successfully timed in at ${manilaTime}.`,
+          'success'
+        );
       } else {
         await api.post('/ojt/time-out');
-        addNotification(`You have successfully timed out at ${manilaTime}.`, 'success');
+        addNotification(
+          `You have successfully timed out at ${manilaTime}.`,
+          'success'
+        );
       }
 
-      // Refresh attendance from MongoDB
       await fetchAll();
-      
-      // Refresh the global timer in the top bar instantly!
-      await fetchActiveSession(); 
-
+      await fetchActiveSession();
     } catch (err) {
       console.error('Attendance action error:', err);
 
       setError(
         err.response?.data?.message ||
-        'Unable to process attendance. Please try again.'
+          'Unable to process attendance. Please try again.'
       );
     } finally {
       setBusy(false);
     }
   };
 
-  // Philippine date for dashboard calculations
   const getToday = () =>
     new Intl.DateTimeFormat('en-CA', {
       timeZone: 'Asia/Manila',
@@ -112,7 +140,6 @@ export default function StudentDashboard() {
 
   const todayStr = getToday();
 
-  // Weekly attendance chart
   const last7Days = Array.from({ length: 7 }, (_, i) => {
     const d = new Date();
     d.setDate(d.getDate() - (6 - i));
@@ -120,7 +147,7 @@ export default function StudentDashboard() {
     const dateStr = format(d, 'yyyy-MM-dd');
 
     const record = attendance.records.find(
-      r => r.attendanceDate === dateStr
+      (r) => r.attendanceDate === dateStr
     );
 
     return {
@@ -137,7 +164,7 @@ export default function StudentDashboard() {
   );
 
   const todayRecords = attendance.records.filter(
-    r => r.attendanceDate === todayStr
+    (r) => r.attendanceDate === todayStr
   );
 
   const todayHours = todayRecords.reduce(
@@ -145,8 +172,46 @@ export default function StudentDashboard() {
     0
   );
 
-  const pendingCount = attendance.records.filter(
-    r => r.status === 'Pending'
+  const pendingAttendanceCount = attendance.records.filter(
+    (r) => r.status === 'Pending'
+  ).length;
+
+  const pendingDocsCount = myDocuments.filter(
+    (d) => d.status === 'Pending'
+  ).length;
+
+  const pendingCount = pendingAttendanceCount + pendingDocsCount;
+
+  const checklistItems =
+    requirements.length > 0
+      ? requirements.map((reqItem) => ({
+          id: reqItem._id || reqItem.title,
+          title: reqItem.title
+        }))
+      : FALLBACK_DOC_TYPES.map((title) => ({
+          id: title,
+          title
+        }));
+
+  const getDocStatusForTitle = (title) => {
+    const matchingDocs = myDocuments.filter(
+      (doc) => (doc.documentType || '').toLowerCase() === title.toLowerCase()
+    );
+
+    if (matchingDocs.some((doc) => doc.status === 'Approved')) {
+      return 'Approved';
+    }
+    if (matchingDocs.some((doc) => doc.status === 'Pending')) {
+      return 'Pending';
+    }
+    if (matchingDocs.some((doc) => doc.status === 'Rejected')) {
+      return 'Rejected';
+    }
+    return 'Missing';
+  };
+
+  const approvedCount = checklistItems.filter(
+    (item) => getDocStatusForTitle(item.title) === 'Approved'
   ).length;
 
   if (loading) {
@@ -159,7 +224,6 @@ export default function StudentDashboard() {
 
   return (
     <div className="space-y-6">
-
       <div>
         <h1 className="text-3xl font-extrabold text-text">
           Hello, {user?.fullName?.split(' ')[0] || 'Student'}
@@ -177,10 +241,8 @@ export default function StudentDashboard() {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
         {/* OJT Progress */}
         <div className="lg:col-span-2 rounded-3xl bg-primary-light p-8 relative overflow-hidden min-h-[220px] flex flex-col justify-between shadow-card">
-
           <div className="relative z-10">
             <span className="inline-flex items-center gap-1.5 text-xs font-semibold bg-white/40 px-3 py-1.5 rounded-full text-primary">
               <Star size={14} /> OJT Progress
@@ -194,8 +256,8 @@ export default function StudentDashboard() {
           </div>
 
           <div className="relative z-10 flex items-center gap-3 mt-6">
-
             <button
+              type="button"
               onClick={() =>
                 handleTime(activeSession ? 'time-out' : 'time-in')
               }
@@ -203,9 +265,11 @@ export default function StudentDashboard() {
               className="flex items-center gap-2 bg-white px-5 py-3 rounded-2xl font-semibold text-sm shadow-card hover:shadow-lg transition disabled:opacity-50"
             >
               <span className="w-7 h-7 rounded-full bg-primary text-white flex items-center justify-center">
-                {activeSession
-                  ? <Square size={14} fill="currentColor" />
-                  : <Play size={14} fill="currentColor" />}
+                {activeSession ? (
+                  <Square size={14} fill="currentColor" />
+                ) : (
+                  <Play size={14} fill="currentColor" />
+                )}
               </span>
 
               {busy
@@ -229,12 +293,9 @@ export default function StudentDashboard() {
 
         {/* Today's Activity */}
         <div className="rounded-3xl bg-white shadow-card p-6">
-          <h3 className="font-extrabold mb-4 text-text">
-            Today's Activity
-          </h3>
+          <h3 className="font-extrabold mb-4 text-text">Today's Activity</h3>
 
           <div className="grid grid-cols-2 gap-3">
-
             <div className="rounded-2xl bg-primary-light p-3">
               <div className="flex items-center gap-1.5 text-xs text-muted mb-1">
                 <Clock size={12} /> Hours
@@ -248,7 +309,9 @@ export default function StudentDashboard() {
               <div className="flex items-center gap-1.5 text-xs text-muted mb-1">
                 <FileText size={12} /> Docs
               </div>
-              <p className="text-xl font-extrabold text-success">0/0</p>
+              <p className="text-xl font-extrabold text-success">
+                {approvedCount}/{checklistItems.length}
+              </p>
             </div>
 
             <div className="rounded-2xl bg-orange-50 p-3">
@@ -266,22 +329,17 @@ export default function StudentDashboard() {
               </div>
               <p className="text-xl font-extrabold text-text">0</p>
             </div>
-
           </div>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
         {/* Total Hours */}
         <div className="rounded-3xl bg-white shadow-card p-6">
-          <h3 className="font-extrabold mb-4 text-text">
-            Total Hours
-          </h3>
+          <h3 className="font-extrabold mb-4 text-text">Total Hours</h3>
 
           <div className="flex items-center justify-center py-4">
             <div className="relative w-44 h-44">
-
               <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
                 <circle
                   cx="50"
@@ -319,9 +377,7 @@ export default function StudentDashboard() {
 
         {/* Weekly Chart */}
         <div className="rounded-3xl bg-white shadow-card p-6">
-          <h3 className="font-extrabold mb-4 text-text">
-            This Week's Hours
-          </h3>
+          <h3 className="font-extrabold mb-4 text-text">This Week's Hours</h3>
 
           <ResponsiveContainer width="100%" height={180}>
             <LineChart data={last7Days}>
@@ -355,36 +411,52 @@ export default function StudentDashboard() {
 
         {/* Required Documents */}
         <div className="rounded-3xl bg-white shadow-card p-6">
-          <h3 className="font-extrabold mb-4 text-text">
-            Required Documents
-          </h3>
+          <h3 className="font-extrabold mb-4 text-text">Required Documents</h3>
 
           <div className="space-y-2">
-            {[
-              'MOA',
-              'Insurance',
-              'Endorsement Letter',
-              'Medical Certificate'
-            ].map(type => (
-              <div
-                key={type}
-                className="flex items-center justify-between p-3 rounded-2xl bg-background"
-              >
-                <div className="flex items-center gap-2">
-                  <Circle size={16} className="text-muted" />
-                  <span className="text-xs font-medium text-text">
-                    {type}
+            {checklistItems.map((item) => {
+              const status = getDocStatusForTitle(item.title);
+              const isApproved = status === 'Approved';
+              const isPending = status === 'Pending';
+              const isRejected = status === 'Rejected';
+
+              return (
+                <div
+                  key={item.id}
+                  className="flex items-center justify-between p-3 rounded-2xl bg-background"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    {isApproved ? (
+                      <CheckCircle2
+                        size={16}
+                        className="text-success shrink-0"
+                      />
+                    ) : (
+                      <Circle size={16} className="text-muted shrink-0" />
+                    )}
+                    <span className="text-xs font-medium text-text truncate">
+                      {item.title}
+                    </span>
+                  </div>
+
+                  <span
+                    className={`text-[10px] font-bold px-2 py-1 rounded-full shrink-0 ${
+                      isApproved
+                        ? 'bg-green-100 text-success'
+                        : isPending
+                          ? 'bg-amber-100 text-warning'
+                          : isRejected
+                            ? 'bg-red-100 text-danger'
+                            : 'bg-gray-100 text-muted'
+                    }`}
+                  >
+                    {status}
                   </span>
                 </div>
-
-                <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-gray-100 text-muted">
-                  Missing
-                </span>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
-
       </div>
     </div>
   );

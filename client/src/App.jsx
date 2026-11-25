@@ -1,7 +1,7 @@
-
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { NotificationProvider } from './context/NotificationContext';
+import { TimerProvider } from './context/TimerContext'; // <-- Added TimerProvider
 import ProtectedRoute from './components/ProtectedRoute';
 import AppLayout from './layouts/AppLayout';
 
@@ -43,125 +43,127 @@ function DashboardRouter() {
 export default function App() {
   return (
     <AuthProvider>
-      <NotificationProvider>
-        <BrowserRouter>
-          <Routes>
-            <Route path="/login" element={<LoginPage />} />
+      <TimerProvider> {/* <-- Wrapped with TimerProvider */}
+        <NotificationProvider>
+          <BrowserRouter>
+            <Routes>
+              <Route path="/login" element={<LoginPage />} />
 
-            <Route
-              element={
-                <ProtectedRoute>
-                  <AppLayout />
-                </ProtectedRoute>
-              }
-            >
-              {/* DASHBOARD */}
-              <Route path="/dashboard" element={<DashboardRouter />} />
+              <Route
+                element={
+                  <ProtectedRoute>
+                    <AppLayout />
+                  </ProtectedRoute>
+                }
+              >
+                {/* DASHBOARD */}
+                <Route path="/dashboard" element={<DashboardRouter />} />
 
-              {/* STUDENT */}
-              <Route
-                path="/attendance"
-                element={
-                  <ProtectedRoute allowedRoles={['student']}>
-                    <Attendance />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/journals"
-                element={
-                  <ProtectedRoute allowedRoles={['student']}>
-                    <Journals />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/documents"
-                element={
-                  <ProtectedRoute allowedRoles={['student']}>
-                    <Documents />
-                  </ProtectedRoute>
-                }
-              />
+                {/* STUDENT */}
+                <Route
+                  path="/attendance"
+                  element={
+                    <ProtectedRoute allowedRoles={['student']}>
+                      <Attendance />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/journals"
+                  element={
+                    <ProtectedRoute allowedRoles={['student']}>
+                      <Journals />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/documents"
+                  element={
+                    <ProtectedRoute allowedRoles={['student']}>
+                      <Documents />
+                    </ProtectedRoute>
+                  }
+                />
 
-              {/* COMPANY SUPERVISOR */}
-              <Route
-                path="/interns"
-                element={
-                  <ProtectedRoute allowedRoles={['staff']}>
-                    <StaffInterns />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/supervisor-reviews"
-                element={
-                  <ProtectedRoute allowedRoles={['staff']}>
-                    <StaffReviews />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/post-requirements"
-                element={
-                  <ProtectedRoute allowedRoles={['staff']}>
-                    <PostRequirements />
-                  </ProtectedRoute>
-                }
-              />
+                {/* COMPANY SUPERVISOR */}
+                <Route
+                  path="/interns"
+                  element={
+                    <ProtectedRoute allowedRoles={['staff']}>
+                      <StaffInterns />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/supervisor-reviews"
+                  element={
+                    <ProtectedRoute allowedRoles={['staff']}>
+                      <StaffReviews />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/post-requirements"
+                  element={
+                    <ProtectedRoute allowedRoles={['staff']}>
+                      <PostRequirements />
+                    </ProtectedRoute>
+                  }
+                />
 
-              {/* COORDINATOR & ADMIN */}
-              <Route
-                path="/students"
-                element={
-                  <ProtectedRoute allowedRoles={['coordinator', 'admin']}>
-                    <StudentList />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/students/:studentId"
-                element={
-                  <ProtectedRoute allowedRoles={['coordinator', 'admin']}>
-                    <StudentDetails />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/review"
-                element={
-                  <ProtectedRoute allowedRoles={['coordinator', 'admin']}>
-                    <ReviewSubmissions />
-                  </ProtectedRoute>
-                }
-              />
+                {/* COORDINATOR & ADMIN */}
+                <Route
+                  path="/students"
+                  element={
+                    <ProtectedRoute allowedRoles={['coordinator', 'admin']}>
+                      <StudentList />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/students/:studentId"
+                  element={
+                    <ProtectedRoute allowedRoles={['coordinator', 'admin']}>
+                      <StudentDetails />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/review"
+                  element={
+                    <ProtectedRoute allowedRoles={['coordinator', 'admin']}>
+                      <ReviewSubmissions />
+                    </ProtectedRoute>
+                  }
+                />
 
-              {/* ADMIN */}
-              <Route
-                path="/companies"
-                element={
-                  <ProtectedRoute allowedRoles={['admin']}>
-                    <ManageCompanies />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/reports"
-                element={
-                  <ProtectedRoute allowedRoles={['admin']}>
-                    <SystemReports />
-                  </ProtectedRoute>
-                }
-              />
-            </Route>
+                {/* ADMIN */}
+                <Route
+                  path="/companies"
+                  element={
+                    <ProtectedRoute allowedRoles={['admin']}>
+                      <ManageCompanies />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/reports"
+                  element={
+                    <ProtectedRoute allowedRoles={['admin']}>
+                      <SystemReports />
+                    </ProtectedRoute>
+                  }
+                />
+              </Route>
 
-            <Route
-              path="*"
-              element={<Navigate to="/login" replace />}
-            />
-          </Routes>
-        </BrowserRouter>
-      </NotificationProvider>
+              <Route
+                path="*"
+                element={<Navigate to="/login" replace />}
+              />
+            </Routes>
+          </BrowserRouter>
+        </NotificationProvider>
+      </TimerProvider>
     </AuthProvider>
   );
 }

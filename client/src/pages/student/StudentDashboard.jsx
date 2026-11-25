@@ -8,11 +8,13 @@ import {
 import { format } from 'date-fns';
 import { useAuth } from '../../context/AuthContext';
 import { useNotifications } from '../../context/NotificationContext';
+import { useTimer } from '../../context/TimerContext'; // <-- Added Timer Context
 import { api } from '../../api/axios';
 
 export default function StudentDashboard() {
   const { user } = useAuth();
   const { addNotification } = useNotifications();
+  const { fetchActiveSession } = useTimer(); // <-- Get the refresh function
 
   const [attendance, setAttendance] = useState({
     summary: null,
@@ -83,6 +85,9 @@ export default function StudentDashboard() {
 
       // Refresh attendance from MongoDB
       await fetchAll();
+      
+      // Refresh the global timer in the top bar instantly!
+      await fetchActiveSession(); 
 
     } catch (err) {
       console.error('Attendance action error:', err);

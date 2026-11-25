@@ -11,8 +11,8 @@ import { useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import ProfilePopover from '../components/ProfilePopover';
 import LiveTimer from '../components/LiveTimer';
-import SettingsModal from '../components/SettingsModal'; // <-- Added Import
-import { useTimer } from '../context/TimerContext'; // <-- Use global timer
+import SettingsModal from '../components/SettingsModal';
+import { useTimer } from '../context/TimerContext';
 
 const navItems = {
   student: [
@@ -45,7 +45,7 @@ const navItems = {
 
 export default function AppLayout() {
   const { user, logout } = useAuth();
-  const { activeSession } = useTimer(); // <-- Use global timer
+  const { activeSession } = useTimer();
   const {
     notifications,
     unreadCount,
@@ -59,7 +59,7 @@ export default function AppLayout() {
 
   const [mobileOpen, setMobileOpen] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
-  const [showSettings, setShowSettings] = useState(false); // <-- Added Settings State
+  const [showSettings, setShowSettings] = useState(false);
 
   const items = navItems[user?.role] || navItems.student;
 
@@ -74,71 +74,92 @@ export default function AppLayout() {
   };
 
   return (
-    <div className="flex min-h-screen bg-background font-sans">
+    <div className="flex h-screen overflow-hidden bg-background font-sans">
+
+      {/* MOBILE BACKDROP */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 z-20 bg-black/30 lg:hidden"
+          onClick={() => setMobileOpen(false)}
+        />
+      )}
 
       {/* SIDEBAR */}
-      <aside className={`
-        fixed lg:static inset-y-0 left-0 z-30
-        w-[88px] bg-white flex flex-col items-center py-6
-        transition-transform duration-300 shadow-soft
-        ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
-      `}>
+      <aside
+        className={`
+          fixed lg:static inset-y-0 left-0 z-30
+          h-full w-[84px] shrink-0 bg-white
+          flex flex-col items-center justify-between py-4 overflow-hidden
+          transition-transform duration-300 shadow-soft
+          ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+        `}
+      >
 
-        {/* LOGO */}
-        <div className="w-11 h-11 rounded-2xl bg-primary flex items-center justify-center mb-10">
-          <span className="text-xl font-extrabold text-white">S</span>
+        {/* TOP: LOGO + PRIMARY NAVIGATION */}
+        <div className="flex flex-col items-center gap-4 w-full">
+          <NavLink
+            to="/dashboard"
+            title="Spike Planted"
+            onClick={() => setMobileOpen(false)}
+            className="w-11 h-11 rounded-2xl bg-primary flex items-center justify-center shrink-0 shadow-card"
+          >
+            <span className="text-xl font-extrabold text-white">S</span>
+          </NavLink>
+
+          <nav className="flex flex-col items-center gap-1.5 w-full">
+            {items.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                title={item.label}
+                onClick={() => setMobileOpen(false)}
+                className={({ isActive }) => `
+                  w-11 h-11 rounded-2xl flex items-center justify-center cursor-pointer
+                  transition-all duration-200 shrink-0
+                  ${isActive
+                    ? 'bg-text text-white shadow-card'
+                    : 'text-muted hover:bg-primary-light hover:text-primary'}
+                `}
+              >
+                <item.icon size={19} strokeWidth={2} />
+              </NavLink>
+            ))}
+          </nav>
         </div>
 
-        {/* NAVIGATION */}
-        <nav className="flex flex-col gap-2 flex-1">
-          {items.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              title={item.label}
-              onClick={() => setMobileOpen(false)}
-              className={({ isActive }) => `
-                w-12 h-12 rounded-2xl flex items-center justify-center cursor-pointer
-                transition-all duration-200
-                ${isActive
-                  ? 'bg-text text-white shadow-card'
-                  : 'text-muted hover:bg-primary-light hover:text-primary'}
-              `}
-            >
-              <item.icon size={20} strokeWidth={2} />
-            </NavLink>
-          ))}
-        </nav>
-
-        {/* SIDEBAR ACTIONS */}
-        <div className="flex flex-col gap-2">
-
+        {/* BOTTOM: UTILITY ACTIONS + AVATAR */}
+        <div className="flex flex-col items-center gap-1.5 w-full pt-2 border-t border-border/60">
           <button
+            type="button"
             onClick={() => alert('Help Center coming soon!')}
             title="Help"
-            className="w-12 h-12 rounded-2xl flex items-center justify-center text-muted hover:bg-background cursor-pointer"
+            className="w-10 h-10 rounded-2xl flex items-center justify-center text-muted hover:bg-background cursor-pointer transition shrink-0"
           >
-            <HelpCircle size={20} />
+            <HelpCircle size={19} />
           </button>
 
           <button
-            onClick={() => setShowSettings(true)} // <-- Changed to open Settings
+            type="button"
+            onClick={() => setShowSettings(true)}
             title="Settings"
-            className="w-12 h-12 rounded-2xl flex items-center justify-center text-muted hover:bg-background cursor-pointer"
+            className="w-10 h-10 rounded-2xl flex items-center justify-center text-muted hover:bg-background cursor-pointer transition shrink-0"
           >
-            <Settings size={20} />
+            <Settings size={19} />
           </button>
 
           <button
+            type="button"
             onClick={handleLogout}
             title="Logout"
-            className="w-12 h-12 rounded-2xl flex items-center justify-center text-muted hover:bg-red-50 hover:text-danger transition cursor-pointer"
+            className="w-10 h-10 rounded-2xl flex items-center justify-center text-muted hover:bg-red-50 hover:text-danger transition cursor-pointer shrink-0"
           >
-            <LogOut size={20} />
+            <LogOut size={19} />
           </button>
 
-          {/* SIDEBAR AVATAR */}
-          <div className="mt-3 w-10 h-10 rounded-full bg-primary-light flex items-center justify-center text-sm font-bold text-primary overflow-hidden">
+          <div
+            title={user?.fullName || 'User'}
+            className="mt-1 w-9 h-9 rounded-full bg-primary-light flex items-center justify-center text-xs font-bold text-primary overflow-hidden shrink-0"
+          >
             {user?.avatar ? (
               <img
                 src={getFileUrl(user.avatar)}
@@ -157,13 +178,20 @@ export default function AppLayout() {
       </aside>
 
       {/* MAIN CONTENT */}
-      <main className="flex-1 flex flex-col min-w-0 ml-[88px] lg:ml-0">
+      <main
+        className="flex-1 h-full overflow-y-auto flex flex-col min-w-0"
+        onClick={handleMainClick}
+      >
 
         {/* HEADER */}
-        <header className="flex items-center justify-between gap-4 px-6 lg:px-10 py-6">
+        <header className="flex items-center justify-between gap-4 px-6 lg:px-10 py-5 shrink-0">
 
           <button
-            onClick={() => setMobileOpen(!mobileOpen)}
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setMobileOpen(!mobileOpen);
+            }}
             className="lg:hidden w-10 h-10 rounded-2xl bg-white flex items-center justify-center shadow-soft cursor-pointer"
           >
             <Menu size={20} />
@@ -187,8 +215,9 @@ export default function AppLayout() {
             )}
 
             {/* NOTIFICATION BELL */}
-            <div className="relative">
+            <div className="relative" onClick={(e) => e.stopPropagation()}>
               <button
+                type="button"
                 onClick={() => {
                   setIsOpen(!isOpen);
                   setShowProfile(false);
@@ -214,6 +243,7 @@ export default function AppLayout() {
                     </h3>
 
                     <button
+                      type="button"
                       onClick={() => setIsOpen(false)}
                       className="text-muted hover:text-text"
                     >
@@ -248,6 +278,7 @@ export default function AppLayout() {
                     <div className="p-3 bg-background flex justify-between border-t border-border">
 
                       <button
+                        type="button"
                         onClick={markAllAsRead}
                         className="text-xs font-bold text-primary hover:underline"
                       >
@@ -255,6 +286,7 @@ export default function AppLayout() {
                       </button>
 
                       <button
+                        type="button"
                         onClick={clearNotifications}
                         className="text-xs font-bold text-danger hover:underline"
                       >
@@ -268,8 +300,9 @@ export default function AppLayout() {
             </div>
 
             {/* CLICKABLE PROFILE */}
-            <div className="relative">
+            <div className="relative" onClick={(e) => e.stopPropagation()}>
               <button
+                type="button"
                 onClick={() => {
                   setShowProfile(!showProfile);
                   setIsOpen(false);
@@ -322,10 +355,7 @@ export default function AppLayout() {
         </header>
 
         {/* PAGE CONTENT */}
-        <div
-          className="flex-1 px-6 lg:px-10 pb-10"
-          onClick={handleMainClick}
-        >
+        <div className="flex-1 px-6 lg:px-10 pb-10">
           <Outlet />
         </div>
 

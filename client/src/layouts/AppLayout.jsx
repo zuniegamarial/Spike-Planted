@@ -1,4 +1,3 @@
-
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Clock, BookOpen, FileText,
@@ -6,11 +5,12 @@ import {
   Building, CheckCircle, X, ClipboardCheck
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { getFileUrl } from '../api/axios';
+import { getFileUrl, api } from '../api/axios'; // Ensure api is exported from your axios file
 import { useNotifications } from '../context/NotificationContext';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import ProfilePopover from '../components/ProfilePopover';
+import LiveTimer from '../components/LiveTimer'; // <-- Imported LiveTimer
 
 const navItems = {
   student: [
@@ -57,8 +57,21 @@ export default function AppLayout() {
 
   const [mobileOpen, setMobileOpen] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
+  const [activeSession, setActiveSession] = useState(null); // <-- State for the timer
 
   const items = navItems[user?.role] || navItems.student;
+
+  // Fetch the active session for the Live Timer
+  useEffect(() => {
+    if (user?.role === 'student') {
+      api.get('/ojt/my-attendance')
+        .then(({ data }) => {
+          const active = data.attendance?.find(r => r.timeOut === null);
+          if (active) setActiveSession(active.timeIn);
+        })
+        .catch(console.error);
+    }
+  }, [user]);
 
   const handleLogout = () => {
     logout();
@@ -177,6 +190,11 @@ export default function AppLayout() {
           </div>
 
           <div className="flex items-center gap-3 relative">
+
+            {/* LIVE TIMER (Only shows if student is timed in) */}
+            {user?.role === 'student' && activeSession && (
+              <LiveTimer startTime={activeSession} />
+            )}
 
             {/* NOTIFICATION BELL */}
             <div className="relative">

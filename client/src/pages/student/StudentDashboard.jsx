@@ -7,12 +7,12 @@ import {
 } from 'recharts';
 import { format } from 'date-fns';
 import { useAuth } from '../../context/AuthContext';
-import { useNotifications } from '../../context/NotificationContext'; // <-- Added Import
+import { useNotifications } from '../../context/NotificationContext';
 import { api } from '../../api/axios';
 
 export default function StudentDashboard() {
   const { user } = useAuth();
-  const { addNotification } = useNotifications(); // <-- Added Hook
+  const { addNotification } = useNotifications();
 
   const [attendance, setAttendance] = useState({
     summary: null,
@@ -65,12 +65,20 @@ export default function StudentDashboard() {
       setBusy(true);
       setError('');
 
+      // Get Manila time for the notification
+      const manilaTime = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Manila',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+      }).format(new Date());
+
       if (action === 'time-in') {
         await api.post('/ojt/time-in');
-        addNotification('You have successfully timed in.', 'success'); // <-- Added Notification
+        addNotification(`You have successfully timed in at ${manilaTime}.`, 'success');
       } else {
         await api.post('/ojt/time-out');
-        addNotification('You have successfully timed out.', 'success'); // <-- Added Notification
+        addNotification(`You have successfully timed out at ${manilaTime}.`, 'success');
       }
 
       // Refresh attendance from MongoDB

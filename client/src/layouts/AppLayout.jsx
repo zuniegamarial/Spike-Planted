@@ -5,12 +5,14 @@ import {
   Building, CheckCircle, X, ClipboardCheck
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { getFileUrl, api } from '../api/axios'; // Ensure api is exported from your axios file
+import { getFileUrl } from '../api/axios';
 import { useNotifications } from '../context/NotificationContext';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import ProfilePopover from '../components/ProfilePopover';
-import LiveTimer from '../components/LiveTimer'; // <-- Imported LiveTimer
+import LiveTimer from '../components/LiveTimer';
+import SettingsModal from '../components/SettingsModal'; // <-- Added Import
+import { useTimer } from '../context/TimerContext'; // <-- Use global timer
 
 const navItems = {
   student: [
@@ -43,7 +45,7 @@ const navItems = {
 
 export default function AppLayout() {
   const { user, logout } = useAuth();
-
+  const { activeSession } = useTimer(); // <-- Use global timer
   const {
     notifications,
     unreadCount,
@@ -57,21 +59,9 @@ export default function AppLayout() {
 
   const [mobileOpen, setMobileOpen] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
-  const [activeSession, setActiveSession] = useState(null); // <-- State for the timer
+  const [showSettings, setShowSettings] = useState(false); // <-- Added Settings State
 
   const items = navItems[user?.role] || navItems.student;
-
-  // Fetch the active session for the Live Timer
-  useEffect(() => {
-    if (user?.role === 'student') {
-      api.get('/ojt/my-attendance')
-        .then(({ data }) => {
-          const active = data.attendance?.find(r => r.timeOut === null);
-          if (active) setActiveSession(active.timeIn);
-        })
-        .catch(console.error);
-    }
-  }, [user]);
 
   const handleLogout = () => {
     logout();
@@ -132,7 +122,7 @@ export default function AppLayout() {
           </button>
 
           <button
-            onClick={() => alert('Settings coming soon!')}
+            onClick={() => setShowSettings(true)} // <-- Changed to open Settings
             title="Settings"
             className="w-12 h-12 rounded-2xl flex items-center justify-center text-muted hover:bg-background cursor-pointer"
           >
@@ -191,7 +181,7 @@ export default function AppLayout() {
 
           <div className="flex items-center gap-3 relative">
 
-            {/* LIVE TIMER (Only shows if student is timed in) */}
+            {/* LIVE TIMER */}
             {user?.role === 'student' && activeSession && (
               <LiveTimer startTime={activeSession} />
             )}
@@ -340,6 +330,12 @@ export default function AppLayout() {
         </div>
 
       </main>
+
+      {/* SETTINGS MODAL */}
+      {showSettings && (
+        <SettingsModal onClose={() => setShowSettings(false)} />
+      )}
+
     </div>
   );
 }
